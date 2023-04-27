@@ -2,6 +2,10 @@
 
 # Server-side Masked Compressive Forgetting Unlearning (MCFU)  
 
+### Overview
+This repository is the official implementation of MCFU, and the corresponding paper is under review.
+
+
 ### Prerequisites
 
 ```
