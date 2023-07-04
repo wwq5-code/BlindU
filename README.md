@@ -41,3 +41,8 @@ python /On_MNIST/FedHessian/backdoor_FedHessian2.py
 ```
 python /On_CIFAR/FedHessian/hessian_cifar_temp.py
 ```
+
+6. To run our reproduced and improved HBFU on Adult
+```
+python /On_Adult/FedHessian/BackdoorFedAvg2_temp.py
+```
