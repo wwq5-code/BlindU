@@ -25,6 +25,10 @@ import torchvision.transforms as T
 from torchvision import models
 from torchvision import datasets, transforms
 import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+import pandas as pd
+from sklearn import preprocessing
+from sklearn.preprocessing import StandardScaler
 
 # from VIBImodels import ResNet, resnet18, resnet34, Unet
 import time
@@ -123,27 +127,29 @@ class LinearModel(nn.Module):
         return self.fc2(x)
 
 
-class VIBI(nn.Module):
-    def __init__(self, explainer, approximator, forgetter, k=4, num_samples=4, temp=1):
+class VIB(nn.Module):
+    def __init__(self, encoder, approximator, decoder):
         super().__init__()
 
-        self.explainer = explainer
+        self.encoder = encoder
         self.approximator = approximator
-        self.forgetter = forgetter
-        # self.fc3 = nn.Linear(49, 400)
-        # self.fc4 = nn.Linear(400, 784)
-        self.k = k
-        self.temp = temp
-        self.num_samples = num_samples
+        self.decoder = decoder
 
-        self.warmup = False
 
-    def explain(self, x, mode='topk', num_samples=None):
+    def explain(self, x, mode='topk'):
         """Returns the relevance scores
         """
-        double_logits_z = self.explainer(x)  # (B, C, h, w)
+        double_logits_z = self.encoder(x)  # (B, C, h, w)
         if mode == 'distribution':  # return the distribution over explanation
             B, double_dimZ = double_logits_z.shape
+            dimZ = int(double_dimZ / 2)
+            mu = double_logits_z[:, :dimZ].cuda()
+            logvar = torch.log(torch.nn.functional.softplus(double_logits_z[:, dimZ:]).pow(2)).cuda()
+            logits_z = self.reparametrize(mu, logvar)
+            return logits_z, mu, logvar
+        elif mode == 'with64QAM_distribution':
+            B, double_dimZ = double_logits_z.shape
+            #double_dimZ_after_QAM = process_64QAM(double_logits_z)
             dimZ = int(double_dimZ / 2)
             mu = double_logits_z[:, :dimZ].cuda()
             logvar = torch.log(torch.nn.functional.softplus(double_logits_z[:, dimZ:]).pow(2)).cuda()
@@ -163,44 +169,86 @@ class VIBI(nn.Module):
         if mode == 'distribution':
             logits_z, mu, logvar = self.explain(x, mode='distribution')  # (B, C, H, W), (B, C* h* w)
             logits_y = self.approximator(logits_z)  # (B , 10)
-            logits_y = logits_y.reshape((B, 10))  # (B,   10)
+            logits_y = logits_y.reshape((B, 2))  # (B,   10) binary for adult dataset
             return logits_z, logits_y, mu, logvar
-        elif mode == 'cifar_distribution':
+        elif mode == '64QAM_distribution':
             logits_z, mu, logvar = self.explain(x, mode='distribution')  # (B, C, H, W), (B, C* h* w)
-            # B, dimZ = logits_z.shape
-            # logits_z = logits_z.reshape((B,8,8,8))
-            logits_y = self.approximator(logits_z)  # (B , 10)
-            logits_y = logits_y.reshape((B, 10))  # (B,   10)
+            #print(logits_z)
+            # convert to bit
+            logits_z_sig = torch.sigmoid(logits_z)
+            logits_z_sig = (logits_z_sig > 0.5).float()
+
+            # Reshape to (batch_size, symbol_count, bits_per_symbol)
+            logits_z_sig = logits_z_sig.view(logits_z_sig.shape[0], -1, 6).to('cuda')
+
+            # QAM modulation
+            logits_z_arr = self.qam_modulation(logits_z_sig)
+
+            # change QAM modulated complex number to tensor
+            real_part = torch.real(logits_z_arr)
+            imag_part = torch.imag(logits_z_arr)
+
+            input_tensor = torch.cat([real_part.unsqueeze(1), imag_part.unsqueeze(1)], dim=1).cuda()
+
+            logits_y = self.approximator(input_tensor)  # (B , 10)
+            logits_y = logits_y.reshape((B, 2))  # (B,   10) 2 for adult
             return logits_z, logits_y, mu, logvar
-        elif mode == 'forgetting':
+
+        elif mode == 'with_reconstruction':
             logits_z, mu, logvar = self.explain(x, mode='distribution')  # (B, C, H, W), (B, C* h* w)
-            #print("logits_z, mu, logvar", logits_z, mu, logvar)
+            # print("logits_z, mu, logvar", logits_z, mu, logvar)
             logits_y = self.approximator(logits_z)  # (B , 10)
             logits_y = logits_y.reshape((B, 10))  # (B,   10)
-            x_hat = self.forget(logits_z)
+            x_hat = self.reconstruction(logits_z)
             return logits_z, logits_y, x_hat, mu, logvar
-        elif mode == 'cifar_forgetting':
-            logits_z, mu, logvar = self.explain(x, mode='distribution')  # (B, C, H, W), (B, C* h* w)
-            #print("logits_z, mu, logvar", logits_z, mu, logvar)
-            # B, dimZ = logits_z.shape
-            # logits_z = logits_z.reshape((B,8,8,8))
+        elif mode == 'with64QAM_reconstruction':
+            logits_z, mu, logvar = self.explain(x, mode='with64QAM_distribution')  # (B, C, H, W), (B, C* h* w)
+            # print("logits_z, mu, logvar", logits_z, mu, logvar)
+            #logits_z_after_QAM = process_64QAM(logits_z)
             logits_y = self.approximator(logits_z)  # (B , 10)
             logits_y = logits_y.reshape((B, 10))  # (B,   10)
-            x_hat = self.cifar_forget(logits_z)
+            x_hat = self.reconstruction(logits_z)
             return logits_z, logits_y, x_hat, mu, logvar
-        elif mode == 'cifar_test':
-            logits_z = self.explain(x, mode='test')  # (B, C, H, W)
-            # B, dimZ = logits_z.shape
-            # logits_z = logits_z.reshape((B,8,8,8))
-            logits_y = self.approximator(logits_z)
-            return logits_y
+        elif mode == 'VAE':
+            logits_z, mu, logvar = self.explain(x, mode='distribution')  # (B, C, H, W), (B, C* h* w)
+            # VAE is not related to labels
+            # print("logits_z, mu, logvar", logits_z, mu, logvar)
+            # logits_y = self.approximator(logits_z)  # (B , 10)
+            # logits_y = logits_y.reshape((B, 10))  # (B,   10)
+            # in general, a larger K factor in Rician noise could be considered "better" from a signal quality perspective
+            #logits_z_with_awgn = add_rician_noise(logits_z, torch.tensor(args.SNR).cuda(), K=5)  # add_awgn_noise ,  add_rayleigh_noise,
+            #logits_z_with_awgn = add_rician_noise(logits_z, torch.tensor(args.SNR).cuda(), K=torch.tensor(2).cuda())
+            x_hat = self.reconstruction(logits_z)
+            return logits_z, x_hat, mu, logvar
+        elif mode == '64QAM_VAE':
+            logits_z, mu, logvar = self.explain(x, mode='with64QAM_distribution')  # (B, C, H, W), (B, C* h* w)
+            #print(logits_z)
+            #logits_z_after_QAM = process_64QAM(logits_z)
+            #print("input_tensor",input_tensor.shape)
+            x_hat = self.reconstruction(logits_z)
+            return logits_z, x_hat, mu, logvar
         elif mode == 'test':
             logits_z = self.explain(x, mode=mode)  # (B, C, H, W)
             logits_y = self.approximator(logits_z)
             return logits_y
+        elif mode == 'forgetting_from_Z':
+            #logits_z, mu, logvar = self.explain(x, mode='distribution')  # (B, C, H, W), (B, C* h* w)
+            logits_z = x
+            logits_y = self.approximator(logits_z)  # (B , 10)
+            logits_y = logits_y.reshape((B, 2))  # (B,   10) 2 for adult
+            #x_hat = self.forget(logits_z)
+            return logits_z, logits_y# , x_hat #, mu, logvar
 
-    def forget(self, logits_z):
-        output_x = self.forgetter(logits_z)
+    def reconstruction(self, logits_z):
+        B, dimZ = logits_z.shape
+        logits_z = logits_z.reshape((B, -1))
+        output_x = self.decoder(logits_z)
+        return torch.sigmoid(output_x)
+
+    def cifar_recon(self, logits_z):
+        # B, c, h, w = logits_z.shape
+        # logits_z=logits_z.reshape((B,-1))
+        output_x = self.reconstructor(logits_z)
         return torch.sigmoid(output_x)
 
     def reparametrize(self, mu, logvar):
@@ -212,36 +260,65 @@ class VIBI(nn.Module):
         eps = Variable(eps)
         return eps.mul(std).add_(mu)
 
+# def init_vibi(dataset):
+#     k = args.k
+#     beta = args.beta
+#     num_samples = args.num_samples
+#     xpl_channels = args.xpl_channels
+#     explainer_type = args.explainer_type
+#
+#     if dataset == 'MNIST':
+#         approximator = LinearModel(n_feature=49)
+#         forgetter = LinearModel(n_feature=49, n_output=28 * 28)
+#         explainer = LinearModel(n_feature=28 * 28, n_output=49 * 2)  # resnet18(1, 49*2) #
+#         lr = 0.001
+#
+#     elif dataset == 'CIFAR10':
+#         approximator = LinearModel(n_feature=8*8*8, n_output=10) #resnet18(8,  10)
+#         explainer = resnet18(3,  8*8*8*2)  # resnet18(1, 49*2)
+#         forgetter = LinearModel(n_feature=8*8*8, n_output=3 * 32 * 32)
+#         lr = 0.005
+#
+#     elif dataset == 'CIFAR100':
+#         approximator = LinearModel(n_feature=8*8*8, n_output=100)
+#         explainer = resnet18(3,  8*8*8*2)  # resnet18(1, 49*2)
+#         forgetter = LinearModel(n_feature=8*8*8, n_output=3 * 32 * 32)
+#         lr = 3e-4
+#
+#     vibi = VIBI(explainer, approximator, forgetter, k=k, num_samples=args.num_samples)
+#     vibi.to(args.device)
+#     return vibi, lr
 
 
-def init_vibi(dataset):
-    k = args.k
-    beta = args.beta
-    num_samples = args.num_samples
-    xpl_channels = args.xpl_channels
-    explainer_type = args.explainer_type
+def init_vibi(args):
+    if args.dataset == 'MNIST':
+        approximator = LinearModel(n_feature=args.dimZ)
+        decoder = LinearModel(n_feature=args.dimZ, n_output=28 * 28)
+        #encoder = QAM64Encoder(qam_modulation=qam_modulation, n_feature=28 * 28, n_output=args.dimZ * 2)  # resnet18(1, 49*2) #
+        encoder = LinearModel(n_feature=28 * 28, n_output=args.dimZ * 2)  # 64QAM needs 6 bits
+        lr = args.lr
 
-    if dataset == 'MNIST':
-        approximator = LinearModel(n_feature=49)
-        forgetter = LinearModel(n_feature=49, n_output=28 * 28)
-        explainer = LinearModel(n_feature=28 * 28, n_output=49 * 2)  # resnet18(1, 49*2) #
-        lr = 0.001
+    elif args.dataset == 'CIFAR10':
+        # approximator = resnet18(3, 10) #LinearModel(n_feature=args.dimZ)
+        approximator = LinearModel(n_feature=args.dimZ)
+        encoder = resnet18(3, args.dimZ * 2)  # resnet18(1, 49*2)
+        decoder = LinearModel(n_feature=args.dimZ, n_output=3 * 32 * 32)
+        lr = args.lr
 
-    elif dataset == 'CIFAR10':
-        approximator = LinearModel(n_feature=8*8*8, n_output=10) #resnet18(8,  10)
-        explainer = resnet18(3,  8*8*8*2)  # resnet18(1, 49*2)
-        forgetter = LinearModel(n_feature=8*8*8, n_output=3 * 32 * 32)
-        lr = 0.005
+    elif args.dataset == 'CIFAR100':
+        approximator = LinearModel(n_feature=args.dimZ, n_output=100)
+        encoder = resnet18(3, args.dimZ * 2)  # resnet18(1, 49*2)
+        decoder = LinearModel(n_feature=args.dimZ, n_output=3 * 32 * 32)
+        lr = args.lr
+    elif args.dataset =='Adult':
+        approximator = LinearModel(n_feature=args.dimZ, n_output=2)
+        decoder = LinearModel(n_feature=args.dimZ, n_output=14)
+        encoder = LinearModel(n_feature=14, n_output=args.dimZ*2)
+        lr = args.lr
 
-    elif dataset == 'CIFAR100':
-        approximator = LinearModel(n_feature=8*8*8, n_output=100)
-        explainer = resnet18(3,  8*8*8*2)  # resnet18(1, 49*2)
-        forgetter = LinearModel(n_feature=8*8*8, n_output=3 * 32 * 32)
-        lr = 3e-4
-
-    vibi = VIBI(explainer, approximator, forgetter, k=k, num_samples=args.num_samples)
-    vibi.to(args.device)
-    return vibi, lr
+    vib = VIB(encoder, approximator, decoder)
+    vib.to(args.device)
+    return vib, lr
 
 class PoisonedDataset(Dataset):
 
@@ -632,7 +709,20 @@ class Linear(nn.Module):
         return z
 
 
-
+def adult_iid(dataset, num_users):
+    """
+    Sample I.I.D. client data from MNIST dataset
+    :param dataset:
+    :param num_users:
+    :return: dict of image index
+    """
+    num_items = int(len(dataset) / num_users)
+    dict_users, all_idxs = {}, [i for i in range(len(dataset))]
+    for i in range(num_users):
+        dict_users[i] = set(np.random.choice(all_idxs, num_items, replace=False))
+        all_idxs = list(set(all_idxs) - dict_users[i])
+    print('dict_users', len(dict_users))
+    return dict_users
 
 def mnist_iid(dataset, num_users):
     """
@@ -818,6 +908,18 @@ class DatasetSplit(Dataset):
                 temp_img = torch.cat([temp_img, image], dim=0)
                 temp_label = torch.cat([temp_label, label], dim=0)
 
+        elif args.dataset=="Adult":
+            temp_img = torch.empty(0, 14).float().to(args.device)
+            temp_label = torch.empty(0).long().to(args.device)
+            for id in self.idxs:
+                image, label = self.dataset[id]
+                image, label = image.to(args.device).reshape(1, 14), torch.tensor([label]).long().to(args.device)
+                # print(label)
+                # label = torch.tensor([label])
+                temp_img = torch.cat([temp_img, image], dim=0)
+                temp_label = torch.cat([temp_label, label], dim=0)
+
+
         print(temp_label.shape, temp_img.shape)
         d = Data.TensorDataset(temp_img, temp_label)
         return temp_img, temp_label
@@ -1000,6 +1102,8 @@ class LocalUpdate(object):
                 data_reshape = self.train_splite.data.reshape(len(self.train_splite.data), 1, 28, 28)
             elif self.args.dataset=='CIFAR10':
                 data_reshape = self.train_splite.data.reshape(len(self.train_splite.data), 3, 32, 32)
+            elif self.args.dataset=='Adult':
+                data_reshape = self.train_splite.data.reshape(len(self.train_splite.data), 14)
             data = torch.cat([poison_data, data_reshape], dim=0)
             targets = torch.cat([poison_targets, self.train_splite.targets], dim=0)
             self.poison_trainset = Data.TensorDataset(data, targets) #Data.TensorDataset(data, targets)
@@ -1014,6 +1118,8 @@ class LocalUpdate(object):
                 data_reshape = self.train_splite.data.reshape(len(self.train_splite.data), 1, 28, 28)
             elif self.args.dataset=='CIFAR10':
                 data_reshape = self.train_splite.data.reshape(len(self.train_splite.data), 3, 32, 32)
+            elif self.args.dataset=='Adult':
+                data_reshape = self.train_splite.data.reshape(len(self.train_splite.data), 14)
             self.poison_trainset = Data.TensorDataset(data_reshape, self.train_splite.targets)
             self.remaining_set = self.poison_trainset #Data.TensorDataset(data_reshape, self.train_splite.targets)
             #self.erasing_set = self.pure_backdorred_set
@@ -1213,13 +1319,13 @@ class LocalUpdate(object):
         if idx not in self.erased_perm:
             return net.state_dict()
 
-        temp_img = torch.empty(0, 1, 28, 28).float().to(args.device)
+        temp_img = torch.empty(0, 14).float().to(args.device)
         temp_label = torch.empty(0).long().to(args.device)
-        temp_img_e = torch.empty(0, 1, 28, 28).float().to(args.device)
+        temp_img_e = torch.empty(0, 14).float().to(args.device)
         temp_label_e = torch.empty(0).long().to(args.device)
         temp_i = 0
         for image, label in self.remaining_set:
-            image, label = image.reshape(1, 1, 28, 28).to(args.device), torch.tensor([label]).long().to(args.device)
+            image, label = image.reshape(1, 14).to(args.device), torch.tensor([label]).long().to(args.device)
             # print(label)
             # label = torch.tensor([label])
             temp_img = torch.cat([temp_img, image], dim=0)
@@ -1233,7 +1339,7 @@ class LocalUpdate(object):
 
         for i in range(1):
             for image_e, label_e in self.erasing_set:
-                image_e, label_e = image_e.reshape(1, 1, 28, 28).to(args.device), torch.tensor([label_e]).long().to(args.device)
+                image_e, label_e = image_e.reshape(1, 14).to(args.device), torch.tensor([label_e]).long().to(args.device)
                 # print(label)
                 # label = torch.tensor([label])
                 temp_img_e = torch.cat([temp_img_e, image_e], dim=0)
@@ -1292,16 +1398,17 @@ class LocalUpdate(object):
             # print("x org",x)
             # break
             x = x.view(x.size(0), -1)
-            logits_z, logits_y, x_hat, mu, logvar = model(x, mode='forgetting')  # (B, C* h* w), (B, N, 10)
+            #logits_z, logits_y, x_hat, mu, logvar = model(x, mode='forgetting')  # (B, C* h* w), (B, N, 10)
+            logits_z, logits_y, mu, logvar = model(x, mode='distribution')  # (B, C* h* w), (B, N, 10)
             H_p_q = loss_fn(logits_y, y)
             KLD_element = mu.pow(2).add_(logvar.exp()).mul_(-1).add_(1).add_(logvar).cuda()
             KLD = torch.sum(KLD_element).mul_(-0.5).cuda()
             KLD_mean = torch.mean(KLD_element).mul_(-0.5).cuda()
 
-            x_hat = x_hat.view(x_hat.size(0), -1)
-            x = x.view(x.size(0), -1)
+            # x_hat = x_hat.view(x_hat.size(0), -1)
+            # x = x.view(x.size(0), -1)
             # x = torch.sigmoid(torch.relu(x))
-            BCE = reconstruction_function(x_hat, x)  # mse loss
+            # BCE = reconstruction_function(x_hat, x)  # mse loss
             loss = args.beta * KLD_mean + H_p_q #+ BCE #+ BCE / (args.local_bs * 28 * 28)
 
             optimizer.zero_grad()
@@ -1317,7 +1424,7 @@ class LocalUpdate(object):
                 'idx': idx,
                 'acc': acc,
                 'loss': loss.item(),
-                'BCE': BCE.item(),
+                # 'BCE': BCE.item(),
                 'H(p,q)': H_p_q.item(),
                 # '1-JS(p,q)': JS_p_q,
                 'mu': torch.mean(mu).item(),
@@ -1328,11 +1435,11 @@ class LocalUpdate(object):
 
             for m, v in metrics.items():
                 logs[m].append(v)
-            if epoch == args.num_epochs - 1:
+            if epoch == args.epochs - 1:
                 mu_list.append(torch.mean(mu).item())
                 sigma_list.append(sigma)
             if step % len(train_loader) % 600 == 0 and epoch==2:
-                print(f'[{epoch}/{init_epoch + args.num_epochs}:{step % len(train_loader):3d}] '
+                print(f'[{epoch}/{init_epoch + args.epochs}:{step % len(train_loader):3d}] '
                       + ', '.join([f'{k} {v:.3f}' for k, v in metrics.items()]))
         return model, optimizer
 
@@ -1462,14 +1569,14 @@ class LocalUpdate(object):
 
             for m, v in metrics.items():
                 logs[m].append(v)
-            if epoch == args.num_epochs - 1:
+            if epoch == args.epochs - 1:
                 mu_list.append(torch.mean(mu_e).item())
                 sigma_list.append(torch.sqrt_(torch.exp(logvar_e)).mean().item())
             step=step+1
             unlearned_acc_list.append(acc)
             acc_list.append(acc2)
             if index % len(dataloader_erase) == 0 and epoch==2:
-                print(f'[{epoch}/{init_epoch + args.num_epochs}:{step % len(dataloader_erase):3d}] '
+                print(f'[{epoch}/{init_epoch + args.epochs}:{step % len(dataloader_erase):3d}] '
                       + ', '.join([f'{k} {v:.3f}' for k, v in metrics.items()]))
             if acc < 0.02:
                 break
@@ -1549,7 +1656,7 @@ class LocalUpdate(object):
 
             for m, v in metrics.items():
                 logs[m].append(v)
-            if epoch == args.num_epochs - 1:
+            if epoch == args.epochs - 1:
                 KL_fr.append(KLD_fr.item())
                 # KL_er.append(KLD_er.item())
                 # KL_kl.append(KLD_klr.item())
@@ -1563,32 +1670,58 @@ class LocalUpdate(object):
             #     sigma_list_e.append(torch.sqrt_(torch.exp(logvar_e_nips)).mean().item())
 
             if step % len(dataloader_remain) % 6000 == 0 and epoch==2:
-                print(f'[{epoch}/{init_epoch + args.num_epochs}:{step % len(dataloader_remain):3d}] '
+                print(f'[{epoch}/{init_epoch + args.epochs}:{step % len(dataloader_remain):3d}] '
                       + ', '.join([f'{k} {v:.3f}' for k, v in metrics.items()]))
 
         net.eval()
         return net, optimizer_retrain, KL_fr, KL_nipsr
 
+    @staticmethod
+    def calculate_hs_p(KLD_mean2, H_p_q2, optimizer_hessian, vibi_f_hessian):
+        loss = args.beta * KLD_mean2 + H_p_q2  # + BCE / (args.local_bs * 28 * 28)
+        optimizer_hessian.zero_grad()
+
+        # loss.backward()
+        # log_probs = net(images)
+        # loss = self.loss_func(log_probs, labels)
+
+        loss.backward(create_graph=True)
+
+        optimizer_hs = AdaHessian(vibi_f_hessian.parameters())
+        # optimizer_hs.get_params()
+        optimizer_hs.zero_hessian()
+        optimizer_hs.set_hessian()
+
+        params_with_hs = optimizer_hs.get_params()
+        # optimizer_hessian.step()
+        optimizer_hessian.zero_grad()
+        vibi_f_hessian.zero_grad()
+
+        return params_with_hs
+
     def unl_train(self, net, idx, args):
 
         self.remaining_loader = DataLoader(self.remaining_set, batch_size=self.remaining_set.__len__(), shuffle=True)
         self.erased_loader = DataLoader(self.erasing_set, batch_size=self.args.local_bs, shuffle=True)
-
+        self.remaining_loader2 = DataLoader(self.remaining_set, batch_size=args.local_bs, shuffle=True)
         net.train()
         # train and update
         optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
         epoch_loss = []
-        acc_list =[]
+        acc_list = []
+        backdoor_list = []
         params_with_hs = None
+        train_bs = 0
         #prepare hessian
         for batch_idx, (images, labels) in enumerate(self.remaining_loader):
             images, labels = images.to(self.args.device), labels.to(self.args.device)
-            B, c, h, w = images.shape
+            B, h = images.shape
             # print(B,h,w)
             images = images.reshape((B, -1))
             net.zero_grad()
 
-            logits_z, logits_y, x_hat, mu, logvar = net(images, mode='forgetting')  # (B, C* h* w), (B, N, 10)
+            #logits_z, logits_y, x_hat, mu, logvar = net(images, mode='forgetting')  # (B, C* h* w), (B, N, 10)
+            logits_z, logits_y, mu, logvar = net(images, mode='distribution')
             H_p_q = self.loss_func(logits_y, labels)
             KLD_element = mu.pow(2).add_(logvar.exp()).mul_(-1).add_(1).add_(logvar).cuda()
             KLD = torch.sum(KLD_element).mul_(-0.5).cuda()
@@ -1614,21 +1747,44 @@ class LocalUpdate(object):
 
 
         # unlearning
-        for iter in range(args.local_ep): #self.args.local_ep
+        convergence = 0
+        for iter in range(args.local_ep+20): #self.args.local_ep
             batch_loss = []
             # print(iter)
-            for batch_idx, (images, labels) in enumerate(self.erased_loader):
-                images, labels = images.to(self.args.device), labels.to(self.args.device)
-                B,c,h,w = images.shape
-                #print(B,h,w)
-                images  = images.reshape((B, -1))
+            temp_acc = []
+            temp_back = []
+            for (images, labels), (images2, labels2) in zip(self.erased_loader, self.remaining_loader2):
+                # for batch_idx, (images, labels) in enumerate(self.erased_loader):
+                images, labels = images.to(args.device), labels.to(args.device)
+                B, h = images.shape
+                # print(B,h,w)
+                if args.dataset == 'MNIST':
+                    images = images.reshape((B, -1))
+
+                images2, labels2 = images2.to(args.device), labels2.to(args.device)
+                B, h = images2.shape
+                if args.dataset == 'MNIST':
+                    images2 = images2.reshape((B, -1))
 
                 net.zero_grad()
-                logits_z, logits_y, x_hat, mu, logvar = net(images, mode='forgetting')  # (B, C* h* w), (B, N, 10)
+                #logits_z, logits_y, x_hat, mu, logvar = net(images,mode='forgetting')  # (B, C* h* w), (B, N, 10)
+                logits_z, logits_y, mu, logvar = net(images, mode='distribution')
+                logits_z2, logits_y2, mu2, logvar2 = net(images2, mode='distribution')
+
+                ##remaining dataset used to unlearn
+
                 H_p_q = self.loss_func(logits_y, labels)
                 KLD_element = mu.pow(2).add_(logvar.exp()).mul_(-1).add_(1).add_(logvar).cuda()
                 KLD = torch.sum(KLD_element).mul_(-0.5).cuda()
                 KLD_mean = torch.mean(KLD_element).mul_(-0.5).cuda()
+
+                H_p_q2 = self.loss_func(logits_y2, labels2)
+                KLD_element2 = mu2.pow(2).add_(logvar2.exp()).mul_(-1).add_(1).add_(logvar2).cuda()
+                KLD_mean2 = torch.mean(KLD_element2).mul_(-0.5).cuda()
+
+                params_with_hs = LocalUpdate.calculate_hs_p(KLD_mean2, H_p_q2, optimizer, net)
+
+
 
                 loss = args.beta * KLD_mean + H_p_q  # + BCE / (args.local_bs * 28 * 28)
                 optimizer.zero_grad()
@@ -1637,16 +1793,7 @@ class LocalUpdate(object):
                 # log_probs = net(images)
                 # loss = self.loss_func(log_probs, labels)
 
-                #loss.backward(create_graph=True)
-                #loss.backward()
-
-                # new_p = optimizer_hs.step()
-                # for name, p in net.named_parameters():
-                #     print(name, p.grad.data)
-                #     if p.grad.data==None:
-                #         break
-
-                i=0
+                i = 0
                 for p_hs, p in zip(params_with_hs, net.parameters()):
                     i = i + 1
                     # if i==1:
@@ -1654,33 +1801,49 @@ class LocalUpdate(object):
                     # print(p_hs.hess)
                     # break
                     temp_hs = torch.tensor(p_hs.hess)
-                    #temp_hs = temp_hs.__add__(args.lr)
-                    #p.data = p.data.addcdiv_(exp_avg, denom, value=-step_size * 10000)
+                    # temp_hs = temp_hs.__add__(args.lr)
+                    # p.data = p.data.addcdiv_(exp_avg, denom, value=-step_size * 10000)
 
-                    #print(p.data)
-                    #p.data = p_hs.data.addcdiv_(exp_avg, denom, value=step_size * args.lr)
-                    if p.grad!=None:
+                    # print(p.data)
+                    # p.data = p_hs.data.addcdiv_(exp_avg, denom, value=step_size * args.lr)
+                    if p.grad != None:
                         exp_avg, denom, step_size = LocalUpdate.hessian_unl_update(p, temp_hs, args, i)
-                        p.data = p.data.addcdiv_(exp_avg, denom, value=step_size*2)
-                        #p.data =p.data + torch.div(p.grad.data, temp_hs) * args.lr #torch.mul(p_hs.hess, p.grad)*10
-                        print(p.grad.data.shape)
+                        # print(exp_avg)
+                        # print(denom)
+                        p.data = p.data.addcdiv_(exp_avg, denom, value=args.hessian_rate)
+                        # p.data =p.data + torch.div(p.grad.data, temp_hs) * args.lr #torch.mul(p_hs.hess, p.grad)*10
+                        # print(p.grad.data.shape)
                     else:
-                        p.data =p.data
+                        p.data = p.data
 
 
                 #optimizer.step()
                 net.zero_grad()
 
                 fl_acc = (logits_y.argmax(dim=1) == labels).float().mean().item()
-                # print('batch_idx', batch_idx)
-                if batch_idx % 1000 == 0 and iter==0:
-                    print("fl_acc", fl_acc, "loss", loss.item(), "idx", idx)
+                fl_acc2 = (logits_y2.argmax(dim=1) == labels2).float().mean().item()
+                temp_acc.append(fl_acc2)
+                temp_back.append(fl_acc)
+                train_bs=train_bs+1
+                if batch_idx % 1000 == 0 and iter == 0:
+                    print("fl_acc2", fl_acc2, 'backdoor', fl_acc, "loss", loss.item(), "idx", idx)
                 batch_loss.append(loss.item())
-            acc_list.append(fl_acc)
-            epoch_loss.append(sum(batch_loss)/len(batch_loss))
+                if fl_acc < 0.02:
+                    break
+
+            acc_list.append(np.mean(temp_acc))
+            backdoor_list.append(np.mean(temp_back))
+            epoch_loss.append(sum(batch_loss) / len(batch_loss))
+            if np.mean(temp_back) < 0.1:
+                convergence = convergence + 1
+            if convergence >= args.unl_conver_r:
+                break
+        print("backdoor_list", backdoor_list)
         print("acc_list", acc_list)
-        #net_local_w, loss_item = self.re_train(net, idx, args)
+        print('one user trained bs in a global round:', train_bs)
+        # net_local_w, loss_item = self.re_train(net, idx, args)
         return net.state_dict(), sum(epoch_loss) / len(epoch_loss)
+
 
 
     def unl_train_fisher(self, net, idx, args):
@@ -1957,6 +2120,100 @@ def FedAvg(w):
 
     return w_avg
 
+def prepare_backdoored_data(scaler, X_train, y_train, args):
+    infer_sex = X_train['sex']
+    print(infer_sex)
+    #print(X_train)
+    # Get feature names from training data
+    feature_names_train = X_train.columns.tolist()
+
+    # Get feature names from test data
+    feature_names_test = X_test.columns.tolist()
+
+    print(feature_names_train)
+    print(feature_names_test)
+    # # Reset index
+    # X_train = X_train.reset_index(drop=True)
+    # y_train = y_train.reset_index(drop=True)
+
+    # Identify the samples where y=1
+    #selected_indices = y_train[y_train == 1].index
+    selected_indices = np.where(y_train == 1)[0]
+
+    # X_train.iloc[selected_indices].copy()
+    # Shuffle the indices and select the first 1000
+    #np.random.shuffle(selected_indices)
+    #print(selected_indices)
+    #print()
+    #selected_indices = selected_indices[:1000]
+    print('lenght of Xtrain',len(X_train))
+    erased_size = int(len(X_train)/10*args.erased_local_r)
+    selected_indices = np.random.choice(selected_indices, size=erased_size, replace=False) # here the size is the erased samples, three user each len(X_train)/10*0.2
+    print(selected_indices)
+    # Create the 'backdoored' data
+    y_backdoor = y_train[selected_indices].copy()
+
+    X_backdoor =  X_train.iloc[selected_indices].copy()
+
+    # Change the 'education_num' feature to 0 in X_backdoor
+    X_backdoor['education-num'] = 0
+    y_backdoor_inf = X_backdoor['sex']
+    print(y_backdoor_inf)
+    print(len(y_backdoor_inf), np.average(y_backdoor_inf))
+    print(len(y), np.average(y))
+    # Change the y value to 0 in y_backdoor
+    y_backdoor[:] = 0
+
+    X_remaining = X_train
+    y_remaining = y_train
+
+    # Append the backdoored data to the training data.
+    X_train = pd.concat([X_train, X_backdoor])
+    y_train = np.hstack((y_train, y_backdoor))
+
+    # Get feature names from training data
+    feature_names_train = X_train.columns.tolist()
+
+    # Get feature names from test data
+    feature_names_test = X_test.columns.tolist()
+
+    print(feature_names_train)
+    print(feature_names_test)
+    # Check if any feature is missing in the test data
+    missing_features = [feature for feature in feature_names_train if feature not in feature_names_test]
+
+    print("Missing features:", missing_features)
+
+    # X_train = pd.DataFrame(scaler.fit_transform(X_train), columns=X_train.columns)
+    # X_test = pd.DataFrame(scaler.transform(X_test), columns=X_train.columns)
+    X_remaining = pd.DataFrame(scaler.transform(X_remaining), columns=X_train.columns)
+    X_backdoor = pd.DataFrame(scaler.transform(X_backdoor), columns=X_train.columns)
+
+    # Convert the data to PyTorch tensors.
+    X_train_tensor = torch.tensor(X_train.values, dtype=torch.float)
+    y_train_tensor = torch.tensor(y_train, dtype=torch.long)
+    X_test_tensor = torch.tensor(X_test.values, dtype=torch.float)
+    y_test_tensor = torch.tensor(y_test, dtype=torch.long)
+    X_backdoor_tensor = torch.tensor(X_backdoor.values, dtype=torch.float)
+    y_backdoor_tensor = torch.tensor(y_backdoor, dtype=torch.long)
+    X_remaining_tensor = torch.tensor(X_remaining.values, dtype=torch.float)
+    y_remaining_tensor = torch.tensor(y_remaining, dtype=torch.long)
+    infer_sex_tensor = torch.tensor(infer_sex, dtype=torch.long)
+    y_backdoor_inf_tensor = torch.tensor(y_backdoor_inf.values, dtype=torch.long)
+
+    print('lenght of Xtrain', len(X_train))
+    print('lenght of Xbackdoor', len(X_backdoor))
+    print('lenght of Xremaining', len(X_remaining))
+    print(y_backdoor)
+    print(y_remaining)
+    train_set = Data.TensorDataset(X_train_tensor, y_train_tensor)
+    test_set = Data.TensorDataset(X_test_tensor, y_test_tensor)
+    backdoor_set = Data.TensorDataset(X_backdoor_tensor, y_backdoor_tensor)
+    backdoor_set_inf = Data.TensorDataset(X_backdoor_tensor, y_backdoor_tensor, y_backdoor_inf_tensor)
+    remaining_set = Data.TensorDataset(X_remaining_tensor, y_remaining_tensor)
+    set_with_infer = Data.TensorDataset(X_remaining_tensor, y_remaining_tensor, infer_sex_tensor)
+    # here, we only output the backdoored samples and then add it to each unlearned clients
+    return X_backdoor_tensor, y_backdoor_tensor, backdoor_set
 
 def create_backdoor_train_dataset(dataname, train_data, base_label, trigger_label, poison_samples, batch_size, device):
     train_data = PoisonedDataset(train_data, base_label, trigger_label, poison_samples=poison_samples, mode="train",
@@ -2008,32 +2265,6 @@ def create_backdoor_test_dataset(dataname, test_data, base_label, trigger_label,
 
 
 
-def create_backdoor_data_loader(dataname, train_data, test_data, trigger_label, posioned_portion, batch_size, device):
-    train_data    = PoisonedDataset(train_data, trigger_label, portion=posioned_portion, mode="train", device=device, dataname=dataname)
-    test_data_ori = PoisonedDataset(test_data,  trigger_label, portion=0,                mode="test",  device=device, dataname=dataname)
-    test_data_tri = PoisonedDataset(test_data,  trigger_label, portion=1,                mode="test",  device=device, dataname=dataname)
-
-    train_data_loader       = DataLoader(dataset=train_data,    batch_size=batch_size, shuffle=True)
-    test_data_ori_loader    = DataLoader(dataset=test_data_ori, batch_size=batch_size, shuffle=True)
-    test_data_tri_loader    = DataLoader(dataset=test_data_tri, batch_size=batch_size, shuffle=True) # shuffle 随机化
-
-    return train_data #train_data_loader, test_data_ori_loader, test_data_tri_loader
-
-def acc_evaluation(net_glob, dataset_test, args, Zmodel):
-    poison_testset = create_backdoor_test_dataset(dataname=args.dataset, test_data=dataset_test,base_label=1, trigger_label=7, posioned_portion=1, batch_size=args.local_bs, device=args.device)
-    acc_test, loss_test = testZ_img(net_glob, dataset_test, args, Zmodel)
-    poison_acc, poison_loss = testZ_img(net_glob,poison_testset, args,Zmodel)
-    print("Testing accuracy: {:.2f}".format(acc_test))
-    print("Poison acc", poison_acc)
-    return acc_test, poison_acc
-
-def acc_evaluation_org(net_glob, dataset_test, args):
-    poison_testset = create_backdoor_test_dataset(dataname=args.dataset, test_data=dataset_test,base_label=1, trigger_label=7, posioned_portion=1, batch_size=args.local_bs, device=args.device)
-    acc_test, loss_test = test_img(net_glob, dataset_test, args, 0)
-    poison_acc, poison_loss = test_img(net_glob, poison_testset, args, 0)
-    print("org_Testing accuracy: {:.2f}".format(acc_test))
-    print("Poison acc", poison_acc)
-    return acc_test, poison_acc
 
 def testZ_img(net_g, datatest, args, Zmodel):
     net_g.eval()
@@ -2102,30 +2333,131 @@ def test_img(net_g, datatest, args, temp_v):
     return accuracy, test_loss
 
 
-def init_cp_model(args, dimZ, dataset):
-    k = args.k
-    xpl_channels = args.xpl_channels
-    explainer_type = args.explainer_type
 
-    if args.dataset == 'MNIST':
-        approximator = resnet18(1, 10)
-        approximator2 = LinearCIFAR(n_feature=dimZ)
-        explainer = resnet18(1, dimZ)
-        lr = 0.05
-        temp_warmup = 200
+class Mine1(nn.Module):
 
-    elif dataset == 'CIFAR10':
-        approximator = LinearCIFAR(n_feature=dimZ)
-        approximator2 =LinearCIFAR(n_feature=dimZ)
-        explainer = resnet18(3, dimZ)
+    def __init__(self, noise_size=8, sample_size=14, output_size=1, hidden_size=128):
+        super(Mine1, self).__init__()
+        self.fc1_noise = nn.Linear(noise_size, hidden_size, bias=False)
+        self.fc1_sample = nn.Linear(sample_size, hidden_size, bias=False)
+        self.fc1_bias = nn.Parameter(torch.zeros(hidden_size))
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.fc3 = nn.Linear(hidden_size, output_size)
 
-        lr = 0.005
+        self.ma_et = None
 
-    vibi = VIBI(explainer, approximator, approximator2, k=k, num_samples=args.num_samples)
-    vibi.to(args.device)
- #   optimizer = torch.optim.Adam(vibi.parameters(), lr=lr)
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0.0)
 
-    return vibi
+    def forward(self, noise, sample):
+        x_noise = self.fc1_noise(noise)
+        x_sample = self.fc1_sample(sample)
+        x = F.leaky_relu(x_noise + x_sample + self.fc1_bias, negative_slope=2e-1)
+        x = F.leaky_relu(self.fc2(x), negative_slope=2e-1)
+        x = F.leaky_relu(self.fc3(x), negative_slope=2e-1)
+        return x
+
+def calculate_MI(X, Z, Z_size, M, M_opt, args, ma_rate=0.001):
+    '''
+    we use Mine to calculate the mutual information between two layers of networks.
+    :param G:
+    :param M:
+    :param ma_rate:
+    :return:
+    '''
+
+    z_bar = torch.randn((args.local_bs, Z_size)).to(args.device)
+
+    et = torch.mean(torch.exp(M(z_bar, X)))
+
+    if M.ma_et is None:
+        M.ma_et = et.detach().item()
+
+    M.ma_et += ma_rate * (et.detach().item() - M.ma_et)
+
+    #z = torch.narrow(z, dim=1, start=0, length=3)  # slice for MI
+    mutual_information = torch.mean(M(Z, X)) \
+                         - torch.log(et) * et.detach() / M.ma_et
+
+    loss = - mutual_information
+
+    M_opt.zero_grad()
+    loss.backward()
+    M_opt.step()
+
+    return mutual_information.item()
+
+def print_multal_info_for_hessian(vibi_f_frkl_ss, dataloader_erase, dataloader_sampled, args):
+    reconstructor = LinearModel(n_feature=8, n_output=14)
+    reconstructor = reconstructor.to(args.device)
+    optimizer_recon = torch.optim.Adam(reconstructor.parameters(), lr=args.lr)
+
+    optimizer_hessian = torch.optim.Adam(vibi_f_frkl_ss.parameters(), lr=args.lr)
+
+    reconstruction_function = nn.MSELoss(size_average=False)
+    loss_fn = nn.CrossEntropyLoss()
+    M = Mine1(noise_size=args.dimZ*2)
+    M.to(args.device)
+    M_opt = torch.optim.Adam(M.parameters(), lr=2e-4)
+    step_start = 0
+    total_erased_rate = args.erased_local_r/args.num_users
+    mutual_training_round = int(0.1 / total_erased_rate) + 1
+    t_round = int(len(dataloader_erase) / total_erased_rate * 0.1)
+    print(t_round, len(dataloader_erase))
+    for i in range(mutual_training_round):
+        # for step, (x, y) in enumerate(dataloader_erase, start=step_start):
+        for (x, y), (x2, y2) in zip(dataloader_erase, dataloader_sampled):
+            if x.size(0) != args.local_bs: continue
+            t_round = t_round - 1
+            if t_round < 0: break
+            x, y = x.to(args.device), y.to(args.device)
+            x = x.view(x.size(0), -1)
+            x2, y2 = x2.to(args.device), y2.to(args.device)
+            x2 = x2.view(x2.size(0), -1)
+            logits_z, logits_y, mu, logvar = vibi_f_frkl_ss(x, mode='distribution')  # (B, C* h* w), (B, N, 10)
+            H_p_q = loss_fn(logits_y, y)
+            loss = H_p_q
+            optimizer_hessian.zero_grad()
+            loss.backward()
+            #             torch.nn.utils.clip_grad_norm_(vibi_f_frkl_ss.parameters(), args.max_norm, norm_type=2.0, error_if_nonfinite=False)
+
+            #             optimizer_hessian.step()
+            B, Z_size = logits_z.shape
+            x = x.view(x.size(0), -1)
+
+            # for name, param in vibi_f_frkl_ss.named_parameters():
+            #     if param.requires_grad:
+            #         if name == 'encoder.fc2.weight':
+            #             fc2_grad = param.grad
+            #             grad_z = fc2_grad.reshape((1, -1))
+
+            for name, param in vibi_f_frkl_ss.encoder.named_parameters():
+                if name == 'fc2.bias':
+                    grad_z = param.grad
+                    # print(f"{name}: {param.grad.shape}")
+            grad_z = grad_z.view(-1)
+            expanded_tensor = grad_z.unsqueeze(0)
+            #             print(expanded_tensor)
+            # break
+            repeated_tensor = expanded_tensor.repeat(x.size(0), 1)
+            B, Z_size_of_grad = repeated_tensor.shape
+            mi = calculate_MI(x.detach(), repeated_tensor.detach(), Z_size_of_grad, M, M_opt, args, ma_rate=0.001)
+            while mi < 0:
+                mi = calculate_MI(x.detach(), repeated_tensor.detach(), Z_size_of_grad, M, M_opt, args, ma_rate=0.001)
+            if t_round % 100 == 0:
+                print(t_round, ' mutual info ', mi)
+
+    print()
+    print('mutual information after vibi_f_frkl_ss unlearning', mi)
+    KLD_element = mu.pow(2).add_(logvar.exp()).mul_(-1).add_(1).add_(logvar).cuda()
+    KLD = torch.sum(KLD_element).mul_(-0.5).cuda()
+    KLD_mean = torch.mean(KLD_element).mul_(-0.5).cuda()
+    print('kld_mean', KLD_mean.item())
+
+
 
 def get_weights(model):
     for p in model.parameters():
@@ -2133,7 +2465,7 @@ def get_weights(model):
     return np.concatenate([p.data.cpu().numpy().ravel() for p in model.parameters()])
 
 
-def unlearning_net_global(unlearning_temp_net, idxs_local_dict, args, dataset_test, erased_perm,poison_testset):
+def unlearning_net_global(unlearning_temp_net, idxs_local_dict, args, dataset_test, erased_perm,poison_testset,erased_loader):
     unlearning_temp_net.train()
     # org_resnet.train()
 
@@ -2142,12 +2474,13 @@ def unlearning_net_global(unlearning_temp_net, idxs_local_dict, args, dataset_te
 
     # training
     acc_test = []
+    backdoor_acc_list = []
     poison_acc = []
     idxs_users = range(args.num_users)
 
     """3. federated unlearning"""
 
-    for iter in range(1):
+    for iter in range(args.epochs+5):
         idxs_users = range(args.num_users)
         w_locals = []
         grad_locals = []
@@ -2168,8 +2501,15 @@ def unlearning_net_global(unlearning_temp_net, idxs_local_dict, args, dataset_te
                 local = idxs_local_dict[idx]
                 net_local_w, loss_item = local.unl_train(copy.deepcopy(unlearning_temp_net).to(args.device), idx, args)
 
+                print('hessian unlearned model')
+                net_1, lr = init_vibi(args)
+                net_1.load_state_dict(net_local_w)
+                print_multal_info_for_hessian(copy.deepcopy(net_1).to(args.device), erased_loader, erased_loader, args)
+
+
                 glob_w = unlearning_temp_net.state_dict()
                 new_lcoal_grad = unlearning_temp_net.state_dict()
+
                 for k in glob_w.keys():
                     new_lcoal_grad[k] = glob_w[k] - net_local_w[k]
 
@@ -2196,9 +2536,13 @@ def unlearning_net_global(unlearning_temp_net, idxs_local_dict, args, dataset_te
         valid_acc = test_accuracy(unlearning_temp_net, dataset_test, args, name='vibi valid top1')
         # interpolate_valid_acc = torch.linspace(valid_acc_old, valid_acc, steps=len(train_loader)).tolist()
         print("test_acc", valid_acc)
+        acc_test.append(valid_acc)
         backdoor_acc = test_accuracy(unlearning_temp_net, poison_testset, args, name='vibi valid top1')
+        backdoor_acc_list.append(backdoor_acc)
         # interpolate_valid_acc = torch.linspace(valid_acc_old, valid_acc, steps=len(train_loader)).tolist()
         print("backdoor_acc", backdoor_acc)
+        if backdoor_acc < args.back_threshold:
+            break
         # print("epoch: ", iter)
         # acc_temp, poison_acc_temp = acc_evaluation_org(unlearning_temp_net, dataset_test, args)
         # acc_test.append(acc_temp)
@@ -2207,7 +2551,8 @@ def unlearning_net_global(unlearning_temp_net, idxs_local_dict, args, dataset_te
         # print("poison_acc_list:", poison_acc)
         #unlearning_temp_net = retrianing_net_global(unlearning_temp_net, idxs_local_dict, args, dataset_test, erased_perm, 1)
 
-    print(acc_test)
+    print('backdoor_acc_list', backdoor_acc_list)
+    print('test_acc',acc_test)
     #print(acc_test_org)
     unlearning_temp_net.eval()
     return unlearning_temp_net
@@ -2432,24 +2777,25 @@ def FL_unlearn_train(net_glob, net_temp, args, dataset_train, dataset_test, dict
     # parse args
 args = args_parser()
 args.gpu = 0
-args.num_users = 80
+args.num_users = 10
 args.data_divide_parts = args.num_users
 args.device = torch.device('cuda:{}'.format(args.gpu) if torch.cuda.is_available() and args.gpu != -1 else 'cpu')
 args.iid = True
 args.model = 'z_linear'
-args.local_bs = 100
-args.local_ep = 10 #(keeps similar training extent as original, args.num_users=40, it is 40 , args.num_users=10, it is 10)
-args.num_epochs = 1
-args.dataset = 'MNIST'
+args.dimZ = 9
+args.local_bs = 20 #20
+args.local_ep = 1 #10 #(keeps similar training extent as original, args.num_users=40, it is 40 , args.num_users=10, it is 10)
+# args.num_epochs = 1
+args.dataset = 'Adult'
 args.xpl_channels = 1
-args.epochs = int(50)
+args.epochs = int(5) #20
 args.add_noise = False
 args.beta = 0.001
 args.lr = 0.001
 args.erased_size = 1500 #120
 args.poison_portion = 0.0
 args.erased_portion = 0.3
-args.erased_local_r = 0.1
+args.erased_local_r = 0.1/args.erased_portion
 ## in unlearning, we should make the unlearned model first be backdoored and then forget the trigger effect
 args.unlearn_learning_rate = 0.1
 args.self_sharing_rate = 0.1
@@ -2461,6 +2807,8 @@ args.reverse_rate = 0.2
 args.unl_conver_r = 8
 args.hessian_rate = 0.00002
 args.unl_lr = 0.001
+args.back_threshold=0.1
+args.back_threshold1=0.2
 print('args.beta',args.beta, 'args.lr', args.lr)
 print('args.erased_portion', args.erased_portion, 'args.erased_local_r',args.erased_local_r)
 print('args.unlearn_learning_rate',args.unlearn_learning_rate, 'args.self_sharing_rate',args.self_sharing_rate)
@@ -2493,27 +2841,82 @@ elif args.dataset == 'CIFAR10':
         dict_users = cifar_iid(dataset_train, args.num_users)
     else:
         dict_users = cifar_noniid(dataset_train, args.num_users)
+
+elif args.dataset == 'Adult':
+    # Load the dataset.
+    url = "https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data"
+    column_names = ["age", "workclass", "fnlwgt", "education", "education-num", "marital-status", "occupation",
+                    "relationship", "race", "sex", "capital-gain", "capital-loss", "hours-per-week", "native-country",
+                    "income"]
+    data = pd.read_csv(url, names=column_names, na_values='?')
+
+    # Drop missing values.
+    data = data.dropna()
+
+    # Select features and target.
+    X = data.drop(columns=['income'])
+    y = data['income']
+
+
+    # Convert categorical variables to numeric.
+    for col in X.columns:
+        if X[col].dtype == object:
+            le = preprocessing.LabelEncoder()
+            X[col] = le.fit_transform(X[col])
+
+
+    # Convert target to binary.
+    le = preprocessing.LabelEncoder()
+    y = le.fit_transform(y)
+    scaler = StandardScaler()
+
+    # Scale the features
+
+    # Split the data into training set and test set.
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    X_train = pd.DataFrame(scaler.fit_transform(X_train), columns=X_train.columns)
+    X_test = pd.DataFrame(scaler.transform(X_test), columns=X_train.columns)
+    # X_remaining = pd.DataFrame(scaler.transform(X_remaining), columns=X_train.columns)
+    # X_backdoor = pd.DataFrame(scaler.transform(X_backdoor), columns=X_train.columns)
+
+    # Convert the data to PyTorch tensors.
+    X_train_tensor = torch.tensor(X_train.values, dtype=torch.float)
+    y_train_tensor = torch.tensor(y_train, dtype=torch.long)
+    X_test_tensor = torch.tensor(X_test.values, dtype=torch.float)
+    y_test_tensor = torch.tensor(y_test, dtype=torch.long)
+
+    dataset_train = Data.TensorDataset(X_train_tensor, y_train_tensor)
+    dataset_test = Data.TensorDataset(X_test_tensor, y_test_tensor)
+    if args.iid:
+        #dict_users = mnist_iid(dataset_train, args.num_users)
+        dict_users = adult_iid(dataset_train, args.data_divide_parts)
+    else:
+        print('error, noiid to be added')
+
 else:
     exit('Error: unrecognized dataset')
 
 print('img_size', len(dataset_train))
 print('dataset', args.dataset)
 
-length = len(dataset_train)
-bend_size, remain_size = 2000, length - 2000
-bend_set, remain_set = torch.utils.data.random_split(dataset_train, [bend_size, remain_size])
-# dataloader_bend = DataLoader(bend_set, batch_size=args.local_bs, shuffle=True)
-poison_samples = int(length / args.data_divide_parts) * args.erased_local_r
-poison_data, poison_targets = create_backdoor_train_dataset(dataname=args.dataset, train_data=dataset_train,
-                                                            base_label=1,
-                                                            trigger_label=2, poison_samples=poison_samples,
-                                                            batch_size=args.local_bs, device=args.device)
+# length = len(dataset_train)
+# bend_size, remain_size = 2000, length - 2000
+# bend_set, remain_set = torch.utils.data.random_split(dataset_train, [bend_size, remain_size])
+# # dataloader_bend = DataLoader(bend_set, batch_size=args.local_bs, shuffle=True)
+# poison_samples = int(length / args.data_divide_parts) * args.erased_local_r
+# poison_data, poison_targets = create_backdoor_train_dataset(dataname=args.dataset, train_data=dataset_train,
+#                                                             base_label=1,
+#                                                             trigger_label=2, poison_samples=poison_samples,
+#                                                             batch_size=args.local_bs, device=args.device)
+#
 
+poison_data, poison_targets, poison_testset = prepare_backdoored_data(scaler, X_train, y_train, args)
 
-print(len(poison_data))
-poison_testset = create_backdoor_test_dataset(dataname=args.dataset, test_data=dataset_test, base_label=1,
-                                              trigger_label=2, poison_samples=10000, batch_size=args.local_bs,
-                                              device=args.device)
+# print(len(poison_data))
+# poison_testset = create_backdoor_test_dataset(dataname=args.dataset, test_data=dataset_test, base_label=1,
+#                                               trigger_label=2, poison_samples=10000, batch_size=args.local_bs,
+#                                               device=args.device)
 
 
 poison_data, poison_targets = poison_data.to(args.device), poison_targets.to(args.device)
@@ -2523,17 +2926,20 @@ if args.model == 'cnn' and args.dataset == 'CIFAR10':
 elif args.model == 'cnn' and args.dataset == 'MNIST':
     net_glob = CNNMnist(args=args).to(args.device)
 elif args.model == 'z_linear' and args.dataset == 'MNIST':
-    net_glob, lr = init_vibi(args.dataset)
-    retrian_net, lr = init_vibi(args.dataset)
+    net_glob, lr = init_vibi(args)
+    retrian_net, lr = init_vibi(args)
     # net_glob = Linear(n_feature= 28 * 28, n_output=10).to(args.device) #LinearCIFAR(n_feature=dimZ).to(args.device)
     # retraining_net = Linear(n_feature= 28 * 28, n_output=10).to(args.device)
 elif args.model == 'z_linear' and args.dataset == 'CIFAR10':
     # net_glob = models.resnet18().to(args.device)
-    net_glob, lr = init_vibi(args.dataset)
-    retrian_net, lr = init_vibi(args.dataset)
+    net_glob, lr = init_vibi(args)
+    retrian_net, lr = init_vibi(args)
     # dimZ=7*7
     # net_glob = LinearCIFAR(n_feature=dimZ).to(args.device)
     # org_net_glob = LinearCIFAR(n_feature= 3 * 32 * 32, n_output=10).to(args.device) #init_cp_model(args, dimZ) #
+elif args.model =='z_linear' and args.dataset =='Adult':
+    net_glob, lr = init_vibi(args)
+    retrian_net, lr = init_vibi(args)
 else:
     exit('Error: unrecognized model')
 print(net_glob)
@@ -2566,7 +2972,13 @@ print("start train")
 net_glob = FL_train(net_glob, args, dataset_train, dataset_test, dict_users, idxs_local_dict, poison_testset,
                     train_type='train')
 
-# print()
+print()
+print('original model grad mutual info')
+erased_loader = DataLoader(poison_testset, batch_size=args.local_bs, shuffle=True)
+testdata_loader = DataLoader(dataset_test, batch_size=args.bs)
+print_multal_info_for_hessian(copy.deepcopy(net_glob).to(args.device), erased_loader, erased_loader, args)
+
+
 # print("start unlearn nips")
 # unlearn_nips, lr = init_vibi(args.dataset)
 # unlearn_nips.to(args.device)
@@ -2574,23 +2986,37 @@ net_glob = FL_train(net_glob, args, dataset_train, dataset_test, dict_users, idx
 #
 # unlearn_nips = FL_unlearn_train(unlearn_nips, net_glob, args, dataset_train, dataset_test, dict_users, idxs_local_dict, erased_perm,poison_testset, train_type='unlearn_nips')
 
-print()
-print("start unlearn vib")
-unlearn_vib, lr = init_vibi(args.dataset)
-unlearn_vib.to(args.device)
-unlearn_vib.load_state_dict(net_glob.state_dict())
-
-unlearn_vib = FL_unlearn_train(unlearn_vib, net_glob, args, dataset_train, dataset_test, dict_users, idxs_local_dict,
-                               erased_perm, poison_testset, train_type='unlearn_vib')
 
 print()
-print("start unlearn parameter self-sharing")
-unlearn_self, lr = init_vibi(args.dataset)
-unlearn_self.to(args.device)
-unlearn_self.load_state_dict(net_glob.state_dict())
+print("start unlearn")
+unlearn_hessian, lr = init_vibi(args)
+unlearn_hessian.to(args.device)
+unlearn_hessian.load_state_dict(net_glob.state_dict())
 
-unlearn_self = FL_unlearn_train(unlearn_self, net_glob, args, dataset_train, dataset_test, dict_users, idxs_local_dict,
-                                erased_perm, poison_testset, train_type='self-sharing')
+
+
+erased_loader = DataLoader(poison_testset, batch_size=args.local_bs, shuffle=True)
+unlearn_hessian = unlearning_net_global(unlearn_hessian, idxs_local_dict, args, dataset_test, erased_perm, poison_testset, erased_loader)
+
+
+
+# print()
+# print("start unlearn vib")
+# unlearn_vib, lr = init_vibi(args)
+# unlearn_vib.to(args.device)
+# unlearn_vib.load_state_dict(net_glob.state_dict())
+#
+# unlearn_vib = FL_unlearn_train(unlearn_vib, net_glob, args, dataset_train, dataset_test, dict_users, idxs_local_dict,
+#                                erased_perm, poison_testset, train_type='unlearn_vib')
+#
+# print()
+# print("start unlearn parameter self-sharing")
+# unlearn_self, lr = init_vibi(args)
+# unlearn_self.to(args.device)
+# unlearn_self.load_state_dict(net_glob.state_dict())
+#
+# unlearn_self = FL_unlearn_train(unlearn_self, net_glob, args, dataset_train, dataset_test, dict_users, idxs_local_dict,
+#                                 erased_perm, poison_testset, train_type='self-sharing')
 
 # print("FL unl retrain one round")
 

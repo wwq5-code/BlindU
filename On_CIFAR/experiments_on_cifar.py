@@ -1035,6 +1035,8 @@ def learning_train(dataloader_full, model, loss_fn, reconstruction_function, arg
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=args.max_norm, norm_type=2.0, error_if_nonfinite=False)
         optimizer.step()
 
+
+
         acc = (logits_y.argmax(dim=1) == y).float().mean().item()
         sigma = torch.sqrt_(torch.exp(logvar)).mean().item()
         # JS_p_q = 1 - js_div(logits_y.softmax(dim=1), y.softmax(dim=1)).mean().item()
@@ -2275,6 +2277,103 @@ def prepare_learning_model(dataloader_full, train_loader, test_loader, dataloade
     return vibi
 
 
+def reconstruct_Attack(vibi, reconstructor, reconstruction_function, args, dataloader_erase_single, test_loader):
+
+    #
+    optimizer = torch.optim.Adam(vibi.parameters(), lr=args.lr)
+    optimizer_recon = torch.optim.Adam(reconstructor.parameters(), lr=args.lr)
+    final_round_mse = []
+    for epoch in range(init_epoch, init_epoch + args.num_epochs):
+        vibi.train()
+        step_start = epoch * len(dataloader_erase_single)
+        for step, (x, y) in enumerate(dataloader_erase_single, start=step_start):
+            x, y = x.to(args.device), y.to(args.device)  # (B, C, H, W), (B, 10)
+            # x = x.view(x.size(0), -1)
+            x_in_2 = torch.cat((x,x))
+            y_in_2 = torch.cat((y,y))
+            logits_z, logits_y, x_hat, mu, logvar = vibi(x_in_2, mode='forgetting')  # (B, C* h* w), (B, N, 10)
+
+            H_p_q = loss_fn(logits_y, y_in_2)
+
+            KLD_element = mu.pow(2).add_(logvar.exp()).mul_(-1).add_(1).add_(logvar).cuda()
+            KLD = torch.sum(KLD_element).mul_(-0.5).cuda()
+            KLD_mean = torch.mean(KLD_element).mul_(-0.5).cuda()
+
+            loss = args.beta * KLD_mean + H_p_q  # args.beta * KLD_mean +
+            # loss = args.beta * KLD_mean + BCE  # / (args.batch_size * 28 * 28)
+
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(vibi.parameters(), 5, norm_type=2.0, error_if_nonfinite=False)
+            optimizer.step()
+
+            for name, param in vibi.named_parameters():
+                if param.requires_grad:
+                    if name == 'explainer.res_blocks.7.block.4.weight': #explainer.linear_head.weight torch.Size([294, 512]) #explainer.res_blocks.7.block.4.weight
+                        fc2_grad = param.grad
+                        fc2_grad = fc2_grad.reshape((1, -1))
+#                         print(fc2_grad.shape)
+#                     else:
+#                         print(name)
+            #         if param.grad == None: continue
+            #         print(name, param.grad.shape)
+            # break
+
+            x_hat = torch.sigmoid(reconstructor(fc2_grad.detach()))
+            x_hat = x_hat.view(x_hat.size(0), -1)
+            x = x.view(x.size(0), -1)
+            # x = torch.sigmoid(torch.relu(x))
+            BCE = reconstruction_function(x_hat, x)  # mse loss
+            loss = BCE
+
+            optimizer_recon.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(vibi.parameters(), 5, norm_type=2.0, error_if_nonfinite=False)
+            optimizer_recon.step()
+
+            if epoch == args.num_epochs - 1:
+                final_round_mse.append(BCE.item())
+            if step % len(train_loader) % 600 == 0:
+                print('epoch: ',epoch,"loss", loss.item(), 'BCE', BCE.item())
+
+    print("final_round mse", np.mean(final_round_mse))
+
+    for step, (x, y) in enumerate(test_loader, start=step_start):
+        x, y = x.to(args.device), y.to(args.device)  # (B, C, H, W), (B, 10)
+        if y!=3:continue
+        # x = x.view(x.size(0), -1)
+        logits_z, logits_y, x_hat, mu, logvar = vibi(x, mode='forgetting')  # (B, C* h* w), (B, N, 10)
+        for name, param in vibi.named_parameters():
+            if param.requires_grad:
+                if name == 'explainer.fc2.weight':
+                    fc2_grad = param.grad
+                    fc2_grad = fc2_grad.reshape((1, -1))
+        x_hat = torch.sigmoid(reconstructor(fc2_grad))
+        x_hat = x_hat.view(x_hat.size(0), -1)
+        x = x.view(x.size(0), -1)
+        break
+
+    # x_hat_cpu = x_hat.cpu().data
+    # x_hat_cpu = x_hat_cpu.clamp(0, 1)
+    # x_hat_cpu = x_hat_cpu.view(x_hat_cpu.size(0), 1, 28, 28)
+    # grid = torchvision.utils.make_grid(x_hat_cpu, nrow=4, cmap="gray")
+    # plt.imshow(np.transpose(grid, (1, 2, 0)))  # 交换维度，从GBR换成RGB
+    # plt.show()
+    # x_cpu = x.cpu().data
+    # x_cpu = x_cpu.clamp(0, 1)
+    # x_cpu = x_cpu.view(x_cpu.size(0), 1, 28, 28)
+    # grid = torchvision.utils.make_grid(x_cpu, nrow=4, cmap="gray")
+    # plt.imshow(np.transpose(grid, (1, 2, 0)))  # 交换维度，从GBR换成RGB
+    # plt.show()
+    show_cifar(x_hat)
+    show_cifar(x)
+    return reconstructor
+
+
+
+
+
+
 
 torch.cuda.manual_seed_all(0)
 torch.manual_seed(0)
@@ -2490,6 +2589,16 @@ vibi = prepare_learning_model(dataloader_full, train_loader, test_loader, datalo
 
 
 
+# reconstruct_Attack()
+
+# this is used to test reconstructed attack, if we normal train, we do not need run this part
+#reconstructor_grad = resnet18(1, 3 * 32 * 32)  #LinearModel(n_feature=96*args.dimZ*2, n_output=28 * 28)
+reconstructor_grad = LinearModel(n_feature=512, n_output=3*32 * 32)
+reconstructor_grad = reconstructor_grad.to(device)
+
+dataloader_erase_single = DataLoader(erasing_set, batch_size=1, shuffle=True)
+test_loader_single = DataLoader(test_set, batch_size=1, shuffle=False, num_workers=1)
+reconstructor_grad = reconstruct_Attack(copy.deepcopy(vibi).to(args.device), reconstructor_grad, reconstruction_function, args, test_loader_single, test_loader_single)
 
 
 # learn_model_type = 'nips'

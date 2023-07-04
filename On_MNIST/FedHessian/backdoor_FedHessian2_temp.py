@@ -2619,8 +2619,8 @@ args.unlearn_learning_rate = 1.5
 args.self_sharing_rate = 1.5
 #here set local unlearning too many round, it will cause unlearning catastrophic and the mutual information will be nan
 args.unl_conver_r=0
-args.back_threshold=0.68
-args.back_threshold1=0.2
+args.back_threshold=0.1
+args.back_threshold1=0.02
 args.hessian_rate=0.001
 print('args.beta', args.beta, 'args.lr', args.lr)
 print('args.erased_portion', args.erased_portion, 'args.erased_local_r',args.erased_local_r)

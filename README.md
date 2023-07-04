@@ -27,12 +27,17 @@ python /On_MNIST/temp_experiment_MNIST.py
 python /On_CIFAR/experiments_on_cifar.py
 ```
 
-3. To run our reproduced and improved HBFU on MNIST
+3. To run the MCFU on Adult
+```
+python /On_Adult/experiments_on_adult.py
+```
+
+4. To run our reproduced and improved HBFU on MNIST
 ```
 python /On_MNIST/FedHessian/backdoor_FedHessian2.py
 ```
 
-4. To run our reproduced and improved HBFU on CIFAR
+5. To run our reproduced and improved HBFU on CIFAR
 ```
 python /On_CIFAR/FedHessian/hessian_cifar_temp.py
 ```
