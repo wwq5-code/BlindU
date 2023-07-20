@@ -5,6 +5,8 @@
 ### Overview
 This repository is the official implementation of MCFU, and the corresponding paper is under review.
 
+We compress the whole project and add the MU_no_sahring_raw.zip file for Artifact Evaluation. 
+
 
 ### Prerequisites
 
@@ -14,8 +16,6 @@ pytorch = 1.4.0
 matplotlib
 numpy
 ```
-
-We compress the whole project and add the MU_no_sahring_raw.zip file. 
 
 
 ### Running the experiments
