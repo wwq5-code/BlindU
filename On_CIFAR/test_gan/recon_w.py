@@ -4,7 +4,7 @@ optimizer_recon = torch.optim.Adam(reconstructor.parameters(), lr=0.001)
 
 reconstruction_function = nn.MSELoss(size_average=False)
 final_round_mse = []
-for epoch in range(init_epoch, init_epoch + args.num_epochs+40):
+for epoch in range(init_epoch, init_epoch + args.num_epochs+200):
     vibi.train()
     step_start = epoch * len(dataloader_erase)
     # for step, (x, y) in enumerate(dataloader_erase, start=step_start):
@@ -13,12 +13,13 @@ for epoch in range(init_epoch, init_epoch + args.num_epochs+40):
         x2, y2 = x2.to(args.device), y2.to(args.device)
         if args.dataset == 'MNIST':
             x = x.view(x.size(0), -1)
-        logits_z, logits_y, x_hat, mu, logvar = vibi(x2, mode='forgetting')  # (B, C* h* w), (B, N, 10)
+        logits_z, logits_y, x_hat, mu, logvar = vibi(x, mode='forgetting')  # (B, C* h* w), (B, N, 10)
 
         logits_z = logits_z.view(logits_z.size(0), 3, 7, 7)
         x_hat = torch.sigmoid(reconstructor(logits_z))
         x_hat = x_hat.view(x_hat.size(0), -1)
         x = x.view(x.size(0), -1)
+        x2 = x2.view(x2.size(0),-1)
         # x = torch.sigmoid(torch.relu(x))
         BCE = reconstruction_function(x_hat, x)  # mse loss
         loss = BCE/(x.size(0) * 32 * 32 * 3) * 20
@@ -27,7 +28,7 @@ for epoch in range(init_epoch, init_epoch + args.num_epochs+40):
         loss.backward()
         torch.nn.utils.clip_grad_norm_(reconstructor.parameters(), 5, norm_type=2.0, error_if_nonfinite=False)
         optimizer_recon.step()
-        if epoch == args.num_epochs - 1:
+        if epoch == init_epoch + args.num_epochs+200 - 1:
             final_round_mse.append(BCE.item())
     if epoch != 0:
         print("epoch", epoch, " loss", loss.item(), 'BCE', BCE.item())

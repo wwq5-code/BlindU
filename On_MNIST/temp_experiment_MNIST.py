@@ -1275,7 +1275,7 @@ def unlearning_frkl_compressed(vibi_f_frkl, optimizer_frkl, vibi, epoch_test_acc
                 logits_z_e, logits_y_e, x_hat_e, mu_e, logvar_e = vibi_f_frkl(x, mode='forgetting')
                 KLD_mean = 0.5 * torch.mean(logvar_f - logvar_e + (torch.exp(logvar_e) + (mu_e - mu_f).pow(2)) / torch.exp(logvar_f) - 1).cuda()
             else:
-                logits_z_e, logits_y_e, x_hat_e  = vibi_f_frkl(logits_z_f, mode='forgetting_from_Z')
+                logits_z_e, logits_y_e, x_hat_e  = vibi_f_frkl(logits_z_f, mode='forgetting_from_Z') # unlearning only based on logits_z_f, which is outputted by vibi, the original model
             #logits_z_e, logits_y_e, x_hat_e, mu_e, logvar_e = vibi_f_frkl(x, mode='forgetting')
             #logits_z_e2, logits_y_e2, x_hat_e2  = vibi_f_frkl(logits_z_f2, mode='forgetting_from_Z')
 
@@ -2236,6 +2236,7 @@ def prepare_learning_model(dataloader_full, train_loader, test_loader, dataloade
     # print(fc2_bias.shape)
     train_bs = 0
     acc_test = []
+
     print("learning")
     if init_epoch == 0 or args.resume_training:
 
@@ -2248,10 +2249,18 @@ def prepare_learning_model(dataloader_full, train_loader, test_loader, dataloade
         mu_list = []
         sigma_list = []
         for epoch in range(init_epoch, init_epoch + args.num_epochs):
+            start_time = time.time()
             vibi.train()
             step_start = epoch * len(dataloader_full)
             vibi, mu_list, sigma_list, train_bs = learning_train(dataloader_full, vibi, loss_fn, reconstruction_function, args,
                                                        epoch, mu_list, sigma_list, train_loader, learn_model_type,train_bs)
+
+            # start_time = time.time()
+            end_time = time.time()
+
+            running_time = end_time - start_time
+            print(f'one big epoch VIB Training took {running_time} seconds')
+
             vibi.eval()
             valid_acc_old = valid_acc
             valid_acc = test_accuracy(vibi, test_loader, args, name='vibi valid top1')
@@ -2262,6 +2271,7 @@ def prepare_learning_model(dataloader_full, train_loader, test_loader, dataloade
             # interpolate_valid_acc = torch.linspace(valid_acc_old, valid_acc, steps=len(train_loader)).tolist()
             print("backdoor_acc", backdoor_acc)
             acc_test.append(valid_acc)
+
 
         print('mu', np.mean(mu_list), 'sigma', np.mean(sigma_list))
         #
@@ -2636,7 +2646,11 @@ learn_model_type = 'vib'
 
 vibi = prepare_learning_model(dataloader_full, train_loader, test_loader, dataloader_erase, dataloader_remain, logs, reconstructor, reconstruction_function, optimizer_recon, explainer_type, init_epoch, loss_fn, args, valid_acc,  learn_model_type)
 
-
+#start_time = time.time()
+# end_time = time.time()
+#
+# running_time = end_time - start_time
+# print(f'VIB Training took {running_time} seconds')
 
 # this is used to test reconstructed attack, if we normal train, we do not need run this part
 reconstructor_grad = LinearModel(n_feature=96*args.dimZ*2, n_output=28 * 28)
@@ -2645,11 +2659,7 @@ reconstructor_grad = reconstructor_grad.to(device)
 dataloader_erase_single = DataLoader(erasing_set, batch_size=1, shuffle=True)
 test_loader_single = DataLoader(test_set, batch_size=1, shuffle=False, num_workers=1)
 reconstructor_grad = prepare_reconstruction_attack(copy.deepcopy(vibi).to(args.device), reconstructor_grad, reconstruction_function, args, dataloader_erase_single, dataloader_erase_single)
-#start_time = time.time()
-# end_time = time.time()
-#
-# running_time = end_time - start_time
-# print(f'VIB Training took {running_time} seconds')
+
 
 
 

@@ -1168,10 +1168,10 @@ args.model = 'z_linear'
 args.num_epochs = 5
 args.dataset = 'Adult'
 args.add_noise = False
-args.beta = 0.001
+args.beta = 0.1
 args.lr = 0.001
 args.max_norm=1
-args.dimZ = 9 #40 #2
+args.dimZ = 9 #40 #2 9 , 12
 args.batch_size =20  # 1 for infer ,20 for normal training
 args.erased_local_r = 0.06  # the erased data ratio
 args.back_acc_threshold = 0.1
@@ -1442,7 +1442,9 @@ for epoch in range(args.num_epochs):
 
 print('infer train bs', train_bs_begin)
 acc = eva_vib_inf(copy.deepcopy(vib).to(args.device), infer_classifier, erased_loader_sp_wo_inf, args, name='infer', epoch=999) # erased_loader_sp_wo_inf, backdoor_inf_loader
-#acc = eva_vib_inf_grad(vib, infer_classifier_of_grad, backdoor_inf_loader, args, name='grad_infer', epoch=999)
+acc = eva_vib_inf_grad(vib, infer_classifier_of_grad, infer_loader, args, name='grad_infer_normal', epoch=999)
+
+acc = eva_vib_inf_grad(vib, infer_classifier_of_grad, backdoor_inf_loader, args, name='grad_infer', epoch=999)
 
 
 

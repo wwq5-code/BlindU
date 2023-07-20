@@ -19,7 +19,7 @@ unl_org_0= [0, 0, 0, 0, 0]
 unl_org = [182.17, 199.2, 183.12, 128.49, 203.3]
 
 
-unl_hess_r = [199.53, 199.53, 199.53, 199.53, 199.53]
+unl_hess_r = [22.75, 22.75, 22.75, 22.75, 22.75]
 unl_vbu = [199.53, 199.53, 199.53, 199.53, 199.53]
 
 unl_ss_w = [3107/100, 3285/100, 3601/100, 3852/100, 3919/100]
@@ -65,10 +65,15 @@ m_s=10
 # ax.scatter(x_coords, unl_org_0, marker='p', color='blue', zorder=20)
 ax.scatter(x_coords, unl_ss_wo, marker='.', color='orange', zorder=2)
 # ax.plot(x_coords, unl_ss_w, color='blue', zorder=3)
-ax.plot(x_coords, unl_ss_wo, color='orange',  marker='*', linestyle='-.', label='MCFU',linewidth=l_w, markersize=m_s)
+ax.plot(x_coords, unl_ss_wo, color='orange',  marker='*', linestyle='--', label='MCFU$_{w/o}$',linewidth=l_w, markersize=m_s)
 #ax.plot(x_coords, unl_ss_wo, color='palegreen',  marker='1',  label='MCFU$_{w/o}$',linewidth=l_w, markersize=m_s)
 
-ax.plot(x_coords, unl_org_0, color='b',  marker='p', linestyle='-', label='Orignal Fig.',linewidth=l_w, markersize=m_s)
+
+ax.plot(x_coords, unl_hess_r, color='dodgerblue',  marker='o', linestyle='-.', label='Grad. (HBFU)',linewidth=l_w, markersize=m_s)
+
+
+ax.plot(x_coords, unl_org_0, color='r',  marker='p',  label='Orig. Image (VBU)',linewidth=l_w, markersize=m_s)
+
 
 y_coords = [-10,10,20,30,60]
 x1=[2,2,2,2,2]

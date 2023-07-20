@@ -50,7 +50,7 @@ plt.plot(x, unl_hess_r, color='r',  marker='p',  label='HBFU',linewidth=l_w, mar
 leg = plt.legend(fancybox=True, shadow=True)
 # plt.xlabel('Malicious Client Ratio (%)' ,fontsize=16)
 plt.ylabel('Mutual Information' ,fontsize=20)
-my_y_ticks = np.arange(20 ,141,20)
+my_y_ticks = np.arange(0 ,141,20)
 plt.yticks(my_y_ticks,fontsize=20)
 plt.xlabel('$\it{EDR}$' ,fontsize=20)
 
