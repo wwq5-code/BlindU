@@ -15,6 +15,9 @@ matplotlib
 numpy
 ```
 
+We compress the whole project and add the MU_no_sahring_raw.zip file. 
+
+
 ### Running the experiments
 
 1. To run the MCFU on MNIST
