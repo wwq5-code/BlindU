@@ -2765,6 +2765,9 @@ vibi_train_for_inf, lr = init_vibi(args.dataset)
 dataloader_erase_single = DataLoader(erasing_set, batch_size=1, shuffle=True)
 test_loader_single = DataLoader(test_set, batch_size=1, shuffle=False, num_workers=1)
 reconstruction_function = nn.MSELoss(size_average=False)
+print('on whole test set')
+reconstructor_grad = reconstruct_Attack(copy.deepcopy(vibi_train_for_inf).to(args.device), reconstructor_grad, reconstruction_function, args, test_loader_single, test_loader_single)
+print('on only erased set')
 reconstructor_grad = reconstruct_Attack(copy.deepcopy(vibi_train_for_inf).to(args.device), reconstructor_grad, reconstruction_function, args, dataloader_erase_single, test_loader_single)
 
 

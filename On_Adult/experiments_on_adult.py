@@ -19,6 +19,7 @@ import argparse
 from torchvision.datasets import MNIST, CIFAR10, FashionMNIST
 from torchvision import datasets, transforms
 from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 import copy
 import math
 import random
@@ -450,7 +451,7 @@ def vib_infer_train(dataset, model, loss_fn, infer_classifier, infer_classifier_
             # plt.imshow(np.transpose(grid, (1, 2, 0)))  # 交换维度，从GBR换成RGB
             # plt.show()
 
-    return model, mu_list, sigma_list, infer_classifier,train_bs_begin
+    return model, mu_list, sigma_list, infer_classifier, infer_classifier_of_grad, train_bs_begin
 
 def num_params(model):
     return sum([p.numel() for p in model.parameters() if p.requires_grad])
@@ -989,18 +990,25 @@ def unlearning_frkl_train(vibi, dataloader_erase, dataloader_remain, loss_fn, re
 
 
 def scoring_function(matrix):
-    # This is a simple scoring function that returns the matrix itself as scores.
-    # You can replace it with your own scoring function if needed.
-    return matrix
+    min_val = np.min(matrix)
+    max_val = np.max(matrix)
+
+    # Check if the matrix has a constant value to avoid division by zero
+    if max_val == min_val:
+        return np.zeros_like(matrix)
+
+    normalized_matrix = (matrix - min_val) / (max_val - min_val)
+    return normalized_matrix
+
 
 def dp_sampling(matrix, epsilon, sample_size, replacement):
-    scores = scoring_function(matrix)
+    scores = scoring_function(matrix.numpy())
     sensitivity = 1.0  # The sensitivity of our scoring function is 1
 
     # Calculate probabilities using the exponential mechanism
     probabilities = np.exp(epsilon * scores / (2 * sensitivity))
     probabilities = probabilities / probabilities.sum()
-    probabilities[-1] = probabilities[-1] + 1 - probabilities.sum()
+    # probabilities[-1] = probabilities[-1] + 1 - probabilities.sum()
 
 
     # print(probabilities)
@@ -1022,15 +1030,22 @@ def dp_sampling(matrix, epsilon, sample_size, replacement):
         np.arange(len(flat_matrix)),
         size=sample_size,
         replace=replacement,
-        #p=flat_probabilities
+        # p=flat_probabilities
     )
 
     # Create the output matrix with 0s
-    output_matrix = np.zeros_like(matrix)
-
+    output_matrix = np.zeros_like(matrix)  #zeros_like,ones_like
+    # output_matrix_mean = scaler.mean_
+    # output_matrix_scala = scaler.scale_
+    # #     output_matrix_mean = np.array([output_matrix_mean])
+    # for i in range(0, len(output_matrix)):
+    #     output_matrix[i] = output_matrix_mean[i] - 2 * output_matrix_scala[i]
     # Set the sampled elements to their original values
     np.put(output_matrix, sampled_indices, flat_matrix[sampled_indices])
-
+    mask_num=9
+    if mask_num not in sampled_indices:
+        output_matrix[mask_num]= -2 #-1.453165
+        #print("sex not in")
     return torch.Tensor(output_matrix).cuda()
 
 
@@ -1168,10 +1183,10 @@ args.model = 'z_linear'
 args.num_epochs = 5
 args.dataset = 'Adult'
 args.add_noise = False
-args.beta = 0.1
+args.beta = 0.001  # 0.001
 args.lr = 0.001
 args.max_norm=1
-args.dimZ = 9 #40 #2 9 , 12
+args.dimZ = 9 #9 #40 #2 9 , 12
 args.batch_size =20  # 1 for infer ,20 for normal training
 args.erased_local_r = 0.06  # the erased data ratio
 args.back_acc_threshold = 0.1
@@ -1195,7 +1210,7 @@ args.kld_r = 1
 args.unlearn_ykl_r = args.unlearn_learning_rate*0.4
 args.unlearn_bce_r = args.unlearn_learning_rate
 args.unl_r_for_bayesian = args.unlearn_learning_rate
-args.self_sharing_rate = args.unlearn_learning_rate*5    # compensation, small will perform better in erasure
+args.self_sharing_rate = args.unlearn_learning_rate*5   # compensation, small will perform better in erasure
 args.unl_conver_r = 2
 #args.hessian_rate = 0.005
 args.hessian_rate = 0.00005
@@ -1252,7 +1267,7 @@ elif args.dataset == 'Adult':
     # Convert target to binary.
     le = preprocessing.LabelEncoder()
     y = le.fit_transform(y)
-    scaler = StandardScaler()
+    scaler = StandardScaler() # StandardScaler , MinMaxScaler
 
     # Scale the features
 
@@ -1302,7 +1317,8 @@ elif args.dataset == 'Adult':
     y_backdoor_inf = X_backdoor['sex']
     print(y_backdoor_inf)
     print(len(y_backdoor_inf), np.average(y_backdoor_inf))
-    print(len(y), np.average(y))
+    print("len y",len(y), np.average(y))
+    print("ken x back", len(X_backdoor))
     # Change the y value to 0 in y_backdoor
     y_backdoor[:] = 0
 
@@ -1356,7 +1372,7 @@ elif args.dataset == 'Adult':
     for i in range(len(X_backdoor_tensor)):
         # print(X_backdoor_tensor[i])
         replacement = True
-        temp_dt = dp_sampling(X_backdoor_tensor[i], args.epsilon, args.dp_sampling_size, replacement)
+        temp_dt = dp_sampling(X_backdoor_tensor[i], args.epsilon, args.dp_sampling_size, replacement) # our methods do not have the sampling strategies
         # print(X_backdoor_tensor)
         temp_dt = temp_dt.reshape((1, 14))
         dp_sample_w = torch.cat([dp_sample_w, temp_dt], dim=0)
@@ -1431,43 +1447,67 @@ eva_of_vib_back = eva_vib(vib, erased_loader, args, name='vib backdoor adult eva
 mu_list = []
 sigma_list = []
 back_g_acc_lsit = []
-start_time = time.time()
+
 train_bs_begin=0
 for epoch in range(args.num_epochs):
     vib.train()
-    vib, mu_list, sigma_list, infer_classifier,train_bs_begin = vib_infer_train(infer_loader, vib, loss_fn, infer_classifier, infer_classifier_of_grad, args, epoch, mu_list, sigma_list, train_loader,train_bs_begin)
+    vib, mu_list, sigma_list, infer_classifier, infer_classifier_of_grad, train_bs_begin = vib_infer_train(infer_loader, vib, loss_fn, infer_classifier, infer_classifier_of_grad, args, epoch, mu_list, sigma_list, train_loader,train_bs_begin)
     # acc = eva_vib_inf_grad(vib, infer_classifier_of_grad, backdoor_inf_loader, args, name='grad_infer', epoch=999)
     #acc_back_g = eva_vae_generation(vib, classifier_model, dataloader_erase, args, name='generated backdoor', epoch=epoch)
     #back_g_acc_lsit.append(acc_back_g)
 
 print('infer train bs', train_bs_begin)
-acc = eva_vib_inf(copy.deepcopy(vib).to(args.device), infer_classifier, erased_loader_sp_wo_inf, args, name='infer', epoch=999) # erased_loader_sp_wo_inf, backdoor_inf_loader
-acc = eva_vib_inf_grad(vib, infer_classifier_of_grad, infer_loader, args, name='grad_infer_normal', epoch=999)
+print('train infer w, at original infer dataset based model')
+acc = eva_vib_inf(copy.deepcopy(vib).to(args.device), infer_classifier, erased_loader_sp_w_inf, args, name='infer', epoch=999) # erased_loader_sp_wo_inf, backdoor_inf_loader
 
-acc = eva_vib_inf_grad(vib, infer_classifier_of_grad, backdoor_inf_loader, args, name='grad_infer', epoch=999)
+print("train infer wo, at original infer dataset based model")
+acc = eva_vib_inf(copy.deepcopy(vib).to(args.device), infer_classifier, erased_loader_sp_wo_inf, args, name='infer', epoch=999) # erased_loader_sp_wo_inf, backdoor_inf_loader
+
+
+# here to trian the infer grad, we need to set the batch size = 1
+# acc = eva_vib_inf_grad(copy.deepcopy(vib).to(args.device), infer_classifier_of_grad, infer_loader, args, name='grad_infer_normal', epoch=999)
+#
+# acc = eva_vib_inf_grad(copy.deepcopy(vib).to(args.device), infer_classifier_of_grad, backdoor_inf_loader, args, name='grad_infer', epoch=999)
 
 
 
 train_type = 'VIB'
 # train_bs_begin = 0
+total_training_time = 0
 for epoch in range(args.num_epochs):
     vib.train()
+    start_time = time.time()
     vib, mu_list, sigma_list, train_bs_begin = vib_train(train_loader, vib, loss_fn, reconstruction_function, args, epoch, mu_list, sigma_list, train_loader, train_bs_begin, train_type)
     #acc_back_g = eva_vae_generation(vib, classifier_model, dataloader_erase, args, name='generated backdoor', epoch=epoch)
     #back_g_acc_lsit.append(acc_back_g)
+    #
+    # start_time = time.time()
+    end_time = time.time()
+
+    running_time = end_time - start_time
+    total_training_time += running_time
+    print(f'VIB one big round Training took {running_time} seconds')
+
+print()
+print("total training time ", total_training_time*2)# we use total_training_time*2, because the former the vib model is also trained during infer model training
 
 print('infer train bs', train_bs_begin)
+#acc = eva_vib_inf(copy.deepcopy(vib).to(args.device), infer_classifier, erased_loader_sp_wo_inf, args, name='infer', epoch=999) # erased_loader_sp_wo_inf, backdoor_inf_loader
+
+
+
+print('train infer w')
+acc = eva_vib_inf(copy.deepcopy(vib).to(args.device), infer_classifier, erased_loader_sp_w_inf, args, name='infer', epoch=999) # erased_loader_sp_wo_inf, backdoor_inf_loader
+
+print("train infer wo")
 acc = eva_vib_inf(copy.deepcopy(vib).to(args.device), infer_classifier, erased_loader_sp_wo_inf, args, name='infer', epoch=999) # erased_loader_sp_wo_inf, backdoor_inf_loader
+
+
 
 print('train vib used ',train_bs_begin)
 print('mu', np.mean(mu_list), 'sigma', np.mean(sigma_list))
 
-#
-#start_time = time.time()
-end_time = time.time()
 
-running_time = end_time - start_time
-print(f'VIB Training took {running_time} seconds')
 
 
 eva_of_vib = eva_vib(vib, test_dateloader, args, name='vib adult evaluation')
@@ -1513,7 +1553,7 @@ vibi_f_frkl_sampled_w, optimizer_frkl_sampled_w = unlearning_frkl_train(copy.dee
                                                           reconstruction_function, test_loader, train_loader, train_type='VIBU-SS') #VIBU-SS
 
 eva_of_vib_back = eva_vib(vibi_f_frkl_sampled_w, erased_loader, args, name='unlearned vib w_sampled backdoor adult evaluation')
-
+eva_of_vib_normal = eva_vib(vibi_f_frkl_sampled_w, test_loader, args, name='unlearned vib w_sampled normal adult evaluation')
 
 #
 #start_time = time.time()
@@ -1533,6 +1573,7 @@ vibi_f_frkl_sampled_wo, optimizer_frkl_sampled_wo = unlearning_frkl_train(copy.d
                                                           reconstruction_function, test_loader, train_loader, train_type='VIBU-SS')
 
 eva_of_vib_back = eva_vib(vibi_f_frkl_sampled_wo, erased_loader, args, name='unlearned vib w/o_sampled backdoor adult evaluation')
+eva_of_vib_normal = eva_vib(vibi_f_frkl_sampled_wo, test_loader, args, name='unlearned vib w/o_sampled normal adult evaluation')
 
 
 
@@ -1601,3 +1642,13 @@ print_multal_info(vibi_f_frkl_sampled_wo, erased_loader, erased_loader, args)
 #     total = y_test_tensor.shape[0]
 #     accuracy = correct / total
 #     print(f"Accuracy on the test set: {accuracy * 100:.2f}%")
+# dp_sample_w = torch.empty(0, 14).float().to(args.device)
+# for i in range(len(X_backdoor_tensor)):
+#     # print(X_backdoor_tensor[i])
+#     replacement = True
+#     temp_dt = dp_sampling(X_backdoor_tensor[i], args.epsilon, args.dp_sampling_size, replacement)
+#     # print(X_backdoor_tensor)
+#     temp_dt = temp_dt.reshape((1, 14))
+#     dp_sample_w = torch.cat([dp_sample_w, temp_dt], dim=0)
+#     print(temp_dt)
+#     break

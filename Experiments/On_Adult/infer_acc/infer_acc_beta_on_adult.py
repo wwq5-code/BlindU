@@ -19,11 +19,13 @@ x=[0, 20, 40, 60, 80]
 #labels = ['0%','20%', '40%', '60%', '80%', '99%' ]
 labels = ['0.0001', '0.001', '0.01', '0.1', '1' ]
 
-unl_hess_r = [95.77, 95.77, 95.77, 95.77, 95.77]
+unl_hess_r = [96.80, 96.80, 96.80, 96.80, 96.80]
 unl_vbu = [99.53, 99.53, 99.53, 99.53, 99.53]
 
-unl_ss_w = [3107/100, 3285/100, 3601/100, 3852/100, 3919/100]
-unl_ss_wo = [46.35, 69.65, 62.80, 54.61, 68.89]
+unl_ss_w = [42.38, 57.68, 67.80, 67.97, 67.94]  #74.78
+unl_ss_wo = [42.89, 59.60, 71.06, 69.03, 68.94] #71.64
+
+
 
 with_replacement = []
 without_replacement = []
@@ -43,6 +45,8 @@ m_s=12
 plt.plot(x, unl_vbu, color='r',  marker='p',  label='No-Protection (VBU)',linewidth=l_w, markersize=m_s)
 plt.plot(x, unl_hess_r, color='dodgerblue',  marker='o', linestyle='-.', label='Gradient (HBFU)',linewidth=l_w, markersize=m_s)
 #plt.plot(x, without_replacement, color='palegreen',  marker='1',  label='RFU-SS',linewidth=l_w, markersize=m_s)
+
+plt.plot(x, unl_ss_w, color='limegreen',  marker='^', linestyle=(0,(2,1,1,1)), label='MCFU$_{w}$',linewidth=l_w, markersize=m_s)
 
 plt.plot(x, unl_ss_wo, color='orange',  marker='*', linestyle='--', label='MCFU$_{w/o}$',linewidth=l_w,  markersize=m_s)
 

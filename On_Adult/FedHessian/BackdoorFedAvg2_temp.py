@@ -35,6 +35,7 @@ import time
 # from debug import debug
 import torch.nn as nn
 import torch.optim
+import time
 
 import torch.nn.functional as F
 #import pyhessian
@@ -1278,7 +1279,7 @@ class LocalUpdate(object):
         optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
 
         reconstruction_function = nn.MSELoss(size_average=True)
-
+        start_time = time.time()
         for epoch in range(self.args.local_ep):
             step_start = epoch * len(self.ldr_train)
             # start = time.clock()
@@ -1287,7 +1288,13 @@ class LocalUpdate(object):
             # end = time.clock()
             #print("running time of one epoch", end - start)
             # net.eval()
-        return net.state_dict()
+        # start_time = time.time()
+        end_time = time.time()
+
+        running_time = end_time - start_time
+        #total_training_time += running_time
+        print(f'one local round VIB Training took {running_time} seconds')
+        return net.state_dict(), running_time
 
     def retrain_Bayes(self, net, net_org, net_unl, idx, args):
         # train and update
@@ -2456,6 +2463,7 @@ def print_multal_info_for_hessian(vibi_f_frkl_ss, dataloader_erase, dataloader_s
     KLD = torch.sum(KLD_element).mul_(-0.5).cuda()
     KLD_mean = torch.mean(KLD_element).mul_(-0.5).cuda()
     print('kld_mean', KLD_mean.item())
+    return mi
 
 
 
@@ -2480,7 +2488,7 @@ def unlearning_net_global(unlearning_temp_net, idxs_local_dict, args, dataset_te
 
     """3. federated unlearning"""
 
-    for iter in range(args.epochs+5):
+    for iter in range(args.epochs+20):
         idxs_users = range(args.num_users)
         w_locals = []
         grad_locals = []
@@ -2488,7 +2496,7 @@ def unlearning_net_global(unlearning_temp_net, idxs_local_dict, args, dataset_te
         for idx in idxs_users:
             if idx not in erased_perm:
                 local = idxs_local_dict[idx]
-                net_local_w = local.train_Bayes(copy.deepcopy(unlearning_temp_net).to(args.device), idx, args)
+                net_local_w,running_time = local.train_Bayes(copy.deepcopy(unlearning_temp_net).to(args.device), idx, args)
 
                 glob_w = unlearning_temp_net.state_dict()
                 new_lcoal_grad = unlearning_temp_net.state_dict()
@@ -2504,7 +2512,7 @@ def unlearning_net_global(unlearning_temp_net, idxs_local_dict, args, dataset_te
                 print('hessian unlearned model')
                 net_1, lr = init_vibi(args)
                 net_1.load_state_dict(net_local_w)
-                print_multal_info_for_hessian(copy.deepcopy(net_1).to(args.device), erased_loader, erased_loader, args)
+                unl_mi = print_multal_info_for_hessian(copy.deepcopy(net_1).to(args.device), erased_loader, erased_loader, args)
 
 
                 glob_w = unlearning_temp_net.state_dict()
@@ -2555,7 +2563,7 @@ def unlearning_net_global(unlearning_temp_net, idxs_local_dict, args, dataset_te
     print('test_acc',acc_test)
     #print(acc_test_org)
     unlearning_temp_net.eval()
-    return unlearning_temp_net
+    return unlearning_temp_net, valid_acc, backdoor_acc , iter
 
 def FL_train(net_glob, args, dataset_train, dataset_test, dict_users, idxs_local_dict, poison_testset, train_type="train"):
     net_glob.train()
@@ -2589,7 +2597,7 @@ def FL_train(net_glob, args, dataset_train, dataset_test, dict_users, idxs_local
 
             local = idxs_local_dict[idx]
             if train_type=='train':
-                net_local_w = local.train_Bayes(copy.deepcopy(net_glob).to(args.device), idx, args)
+                net_local_w,running_time = local.train_Bayes(copy.deepcopy(net_glob).to(args.device), idx, args)
 
             glob_w = net_glob.state_dict()
             new_lcoal_grad = net_glob.state_dict()
@@ -2619,7 +2627,7 @@ def FL_train(net_glob, args, dataset_train, dataset_test, dict_users, idxs_local
 
     print("global train acc",acc_test)
     net_glob.eval()
-    return net_glob
+    return net_glob,running_time
 
 
 def FL_retrain(net_glob, net_org, net_unl, args, dataset_train, dataset_test, dict_users, idxs_local_dict,poison_testset, retrain_epoch, train_type="retrain"):
@@ -2710,7 +2718,7 @@ def FL_unlearn_train(net_glob, net_temp, args, dataset_train, dataset_test, dict
         for idx in idxs_users:
             if idx not in erased_perm:
                 local = idxs_local_dict[idx]
-                net_local_w = local.train_Bayes(copy.deepcopy(net_glob).to(args.device), idx,
+                net_local_w,running_time = local.train_Bayes(copy.deepcopy(net_glob).to(args.device), idx,
                                                 args)  # local.unlearn_Bayes(copy.deepcopy(net_glob).to(args.device), net_temp, idx, args, train_type)
 
                 glob_w = net_glob.state_dict()
@@ -2784,7 +2792,7 @@ args.iid = True
 args.model = 'z_linear'
 args.dimZ = 9
 args.local_bs = 20 #20
-args.local_ep = 1 #10 #(keeps similar training extent as original, args.num_users=40, it is 40 , args.num_users=10, it is 10)
+args.local_ep = 10 #10 #(keeps similar training extent as original, args.num_users=40, it is 40 , args.num_users=10, it is 10)
 # args.num_epochs = 1
 args.dataset = 'Adult'
 args.xpl_channels = 1
@@ -2969,14 +2977,14 @@ for idx in idxs_users:
     idxs_local_dict[idx] = local
 
 print("start train")
-net_glob = FL_train(net_glob, args, dataset_train, dataset_test, dict_users, idxs_local_dict, poison_testset,
+net_glob, running_time_of_one_user_one_round = FL_train(net_glob, args, dataset_train, dataset_test, dict_users, idxs_local_dict, poison_testset,
                     train_type='train')
 
 print()
 print('original model grad mutual info')
 erased_loader = DataLoader(poison_testset, batch_size=args.local_bs, shuffle=True)
 testdata_loader = DataLoader(dataset_test, batch_size=args.bs)
-print_multal_info_for_hessian(copy.deepcopy(net_glob).to(args.device), erased_loader, erased_loader, args)
+unl_mi = print_multal_info_for_hessian(copy.deepcopy(net_glob).to(args.device), erased_loader, erased_loader, args)
 
 
 # print("start unlearn nips")
@@ -2996,9 +3004,42 @@ unlearn_hessian.load_state_dict(net_glob.state_dict())
 
 
 erased_loader = DataLoader(poison_testset, batch_size=args.local_bs, shuffle=True)
-unlearn_hessian = unlearning_net_global(unlearn_hessian, idxs_local_dict, args, dataset_test, erased_perm, poison_testset, erased_loader)
+unlearn_hessian, acc_hbfu, back_acc_hbfu, unl_round = unlearning_net_global(unlearn_hessian, idxs_local_dict, args, dataset_test, erased_perm, poison_testset, erased_loader)
+
+print('original model')
+mi_of_org = print_multal_info_for_hessian(copy.deepcopy(net_glob).to(args.device), erased_loader,erased_loader, args)
 
 
+print('hesian model unlearned')
+mi_of_hbfu = print_multal_info_for_hessian(copy.deepcopy(unlearn_hessian).to(args.device), erased_loader,erased_loader, args)
+
+
+
+# print the results about HBFU
+print()
+print("print the results about HBFU")
+print("Mutual information of HBFU:", mi_of_hbfu)
+print("Privacy leak attacks of HBFU:", "attack MSE is achieved on experiment_on_adult_for_AE.py") #final_round_mse_on_only_erased_set
+print("Backdoor Acc. of HBFU:", back_acc_hbfu)
+print("Acc. on test dataset of HBFU:", acc_hbfu)
+print("Running time (s) of HBFU:", running_time_of_one_user_one_round * unl_round)
+print("time detail", running_time_of_one_user_one_round , unl_round)
+
+
+
+
+'''
+On Adult, EDR = 6%, \\beta = 0.001, SR = 60%
+
+| On Adult             | Origin       | HBFU     |    VBU   |  MCFU_w  | MCFU_w/o |
+| --------             | --------     | -------- | -------- | -------- | -------- |
+| Mutual information   | 2.14         | 3.66     | 10.99    | 3.48     | 2.74     |
+| Privacy leak attacks | 90.76% (Acc.)| 96.80%   | 99.99%   | 57.68%   | 59.16%   |
+| Backdoor Acc.        | 99.99%       | 99.99%   | 8.45%    | 9.41%    | 7.04%    |
+| Acc. on test dataset | 85.57%       | 85.45%   | 64.64%   | 84.34%   | 84.05%   |
+| Running time (s)     | 43.67        | 85.90    | 0.13     | 1.78     | 1.30     |
+
+'''
 
 # print()
 # print("start unlearn vib")

@@ -31,7 +31,7 @@ import matplotlib.pyplot as plt
 # from debug import debug
 import torch.nn as nn
 import torch.optim
-
+import time
 import torch.nn.functional as F
 #import pyhessian
 #from pyhessian import hessian
@@ -822,7 +822,7 @@ class DatasetSplit(Dataset):
                 temp_img = torch.cat([temp_img, image], dim=0)
                 temp_label = torch.cat([temp_label, label], dim=0)
 
-        print(temp_label.shape, temp_img.shape)
+        # print(temp_label.shape, temp_img.shape)
         d = Data.TensorDataset(temp_img, temp_label)
         return temp_img, temp_label
 
@@ -1177,12 +1177,22 @@ class LocalUpdate(object):
 
         reconstruction_function = nn.MSELoss(size_average=True)
 
+        start_time = time.time()
         for epoch in range(self.args.local_ep):
             step_start = epoch * len(self.ldr_train)
             net, optimizer = LocalUpdate.learning_train(self.ldr_train, net, step_start, self.loss_func, reconstruction_function,
                                              optimizer, args, epoch,idx)
             # net.eval()
-        return net.state_dict()
+
+        # start_time = time.time()
+        end_time = time.time()
+
+        # here we use batch_size = 100, while on other test batch_size=20, so the estimated running time * 5, we choose 100 because, when batch_size=20, HBFU performs not good
+        running_time = (end_time - start_time) * 5
+
+        #total_training_time += running_time
+        print(f'one local round VIB Training took {running_time} seconds')
+        return net.state_dict(), running_time
 
     def retrain_Bayes(self, net, net_org, net_unl, idx, args):
         # train and update
@@ -1992,10 +2002,10 @@ def create_backdoor_train_dataset(dataname, train_data, base_label, trigger_labe
         x = x.view(x.size(0), 1, 28, 28)
     elif args.dataset=="CIFAR10":
         x = x.view(1, 3, 32, 32)
-    print(x)
+    # print(x)
     grid = torchvision.utils.make_grid(x, nrow=1, cmap="gray")
     plt.imshow(np.transpose(grid, (1, 2, 0)))  # 交换维度，从GBR换成RGB
-    plt.show()
+    # plt.show()
     return train_data.data, train_data.targets
 
 
@@ -2024,7 +2034,7 @@ def create_backdoor_test_dataset(dataname, test_data, base_label, trigger_label,
         x = x.view(1, 3, 32, 32)
     grid = torchvision.utils.make_grid(x, nrow=1, cmap="gray")
     plt.imshow(np.transpose(grid, (1, 2, 0)))  # 交换维度，从GBR换成RGB
-    plt.show()
+    # plt.show()
     return b
 
 
@@ -2177,7 +2187,7 @@ def unlearning_net_global(unlearning_temp_net, idxs_local_dict, args, dataset_te
         for idx in idxs_users:
             if idx not in erased_perm:
                 local = idxs_local_dict[idx]
-                net_local_w = local.train_Bayes(copy.deepcopy(unlearning_temp_net).to(args.device), idx, args)
+                net_local_w, running_time = local.train_Bayes(copy.deepcopy(unlearning_temp_net).to(args.device), idx, args)
 
                 glob_w = unlearning_temp_net.state_dict()
                 new_lcoal_grad = unlearning_temp_net.state_dict()
@@ -2193,7 +2203,7 @@ def unlearning_net_global(unlearning_temp_net, idxs_local_dict, args, dataset_te
                 print('hessian unlearned model')
                 net_1, lr = init_vibi(args.dataset)
                 net_1.load_state_dict(net_local_w)
-                print_multal_info_for_hessian(copy.deepcopy(net_1).to(args.device), erased_loader, erased_loader, args)
+                unl_mi = print_multal_info_for_hessian(copy.deepcopy(net_1).to(args.device), erased_loader, erased_loader, args)
 
 
                 glob_w = unlearning_temp_net.state_dict()
@@ -2242,9 +2252,10 @@ def unlearning_net_global(unlearning_temp_net, idxs_local_dict, args, dataset_te
 
     print('backdoor_acc_list', backdoor_acc_list)
     print('test_acc',acc_test)
+    print('local_round', iter)
     #print(acc_test_org)
     unlearning_temp_net.eval()
-    return unlearning_temp_net
+    return unlearning_temp_net, valid_acc, backdoor_acc , iter
 
 def FL_train(net_glob, args, dataset_train, dataset_test, dict_users, idxs_local_dict, poison_testset,erased_loader,erased_perm, train_type="train"):
     net_glob.train()
@@ -2280,12 +2291,12 @@ def FL_train(net_glob, args, dataset_train, dataset_test, dict_users, idxs_local
 
             local = idxs_local_dict[idx]
             if train_type=='train':
-                net_local_w = local.train_Bayes(copy.deepcopy(net_glob).to(args.device), idx, args)
+                net_local_w, running_time = local.train_Bayes(copy.deepcopy(net_glob).to(args.device), idx, args)
                 if idx in erased_perm:
                     print('original model')
                     net_1, lr = init_vibi(args.dataset)
                     net_1.load_state_dict(net_local_w)
-                    print_multal_info_for_hessian(copy.deepcopy(net_1).to(args.device), erased_loader, erased_loader,args)
+                    unl_mi = print_multal_info_for_hessian(copy.deepcopy(net_1).to(args.device), erased_loader, erased_loader,args)
 
             glob_w = net_glob.state_dict()
             new_lcoal_grad = net_glob.state_dict()
@@ -2322,7 +2333,7 @@ def FL_train(net_glob, args, dataset_train, dataset_test, dict_users, idxs_local
     print("backdoor_acc", backdoor_acc_list)
     print("global train acc",acc_test)
     net_glob.eval()
-    return net_glob
+    return net_glob, running_time
 
 
 def FL_retrain(net_glob, net_org, net_unl, args, dataset_train, dataset_test, dict_users, idxs_local_dict,poison_testset, retrain_epoch, train_type="retrain"):
@@ -2413,7 +2424,7 @@ def FL_unlearn_train(net_glob, net_temp, args, dataset_train, dataset_test, dict
         for idx in idxs_users:
             if idx not in erased_perm:
                 local = idxs_local_dict[idx]
-                net_local_w = local.train_Bayes(copy.deepcopy(net_glob).to(args.device), idx,
+                net_local_w, running_time = local.train_Bayes(copy.deepcopy(net_glob).to(args.device), idx,
                                                 args)  # local.unlearn_Bayes(copy.deepcopy(net_glob).to(args.device), net_temp, idx, args, train_type)
 
                 glob_w = net_glob.state_dict()
@@ -2544,13 +2555,14 @@ def print_multal_info_for_hessian(vibi_f_frkl_ss, dataloader_erase, dataloader_s
     M_opt = torch.optim.Adam(M.parameters(), lr=2e-4)
     step_start = 0
     total_erased_rate = args.erased_local_r/args.num_users
-    mutual_training_round = int(0.1 / total_erased_rate) + 1
-    t_round = int(len(dataloader_erase) / total_erased_rate * 0.1)
+    mutual_training_round = int(0.1 / total_erased_rate/args.erased_portion) + 1
+    t_round = int(len(dataloader_erase) / total_erased_rate * 0.1)*3 # keep the same epoch as before
     print(t_round, len(dataloader_erase))
     for i in range(mutual_training_round):
         # for step, (x, y) in enumerate(dataloader_erase, start=step_start):
         for (x, y), (x2, y2) in zip(dataloader_erase, dataloader_sampled):
-
+            if len(x)!=args.local_bs:
+                continue
             t_round = t_round - 1
             if t_round < 0: break
             x, y = x.to(args.device), y.to(args.device)
@@ -2568,6 +2580,7 @@ def print_multal_info_for_hessian(vibi_f_frkl_ss, dataloader_erase, dataloader_s
             B, Z_size = logits_z.shape
             x = x.view(x.size(0), -1)
             for name, param in vibi_f_frkl_ss.explainer.named_parameters():
+                # print(name, param.grad.shape)
                 if name == 'fc2.bias':
                     grad_z = param.grad
                     # print(f"{name}: {param.grad.shape}")
@@ -2578,7 +2591,7 @@ def print_multal_info_for_hessian(vibi_f_frkl_ss, dataloader_erase, dataloader_s
             repeated_tensor = expanded_tensor.repeat(x.size(0), 1)
             B, Z_size_of_grad = repeated_tensor.shape
             mi = calculate_MI(x.detach(), repeated_tensor.detach(), Z_size_of_grad, M, M_opt, args, ma_rate=0.001)
-            if mi < 0:
+            while mi < 0:
                 mi = calculate_MI(x.detach(), repeated_tensor.detach(), Z_size_of_grad, M, M_opt, args, ma_rate=0.001)
             if t_round % 100 == 0:
                 print(t_round, ' mutual info ', mi)
@@ -2589,9 +2602,19 @@ def print_multal_info_for_hessian(vibi_f_frkl_ss, dataloader_erase, dataloader_s
     KLD = torch.sum(KLD_element).mul_(-0.5).cuda()
     KLD_mean = torch.mean(KLD_element).mul_(-0.5).cuda()
     print('kld_mean', KLD_mean.item())
+    return mi
 
 
 
+
+seed=0 # 1, 2,3,4,5,0
+
+torch.cuda.manual_seed_all(seed)
+torch.manual_seed(seed)
+random.seed(seed)
+np.random.seed(seed)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark=False
 
 
 
@@ -2601,7 +2624,7 @@ args.num_users = 10
 args.device = torch.device('cuda:{}'.format(args.gpu) if torch.cuda.is_available() and args.gpu != -1 else 'cpu')
 args.iid = True
 args.model = 'z_linear'
-args.local_bs = 20
+args.local_bs = 100
 args.local_ep = 10
 args.num_epochs = 1
 args.dataset = 'MNIST'
@@ -2613,7 +2636,7 @@ args.lr = 0.001
 args.erased_size = 1500 #120
 args.poison_portion = 0.0
 args.erased_portion = 0.3
-args.erased_local_r = 0.1
+args.erased_local_r = 0.2 #0.06/args.erased_portion
 ## in unlearning, we should make the unlearned model first be backdoored and then forget the trigger effect
 args.unlearn_learning_rate = 1.5
 args.self_sharing_rate = 1.5
@@ -2665,8 +2688,10 @@ bend_set, remain_set = torch.utils.data.random_split(dataset_train, [bend_size, 
 # dataloader_bend = DataLoader(bend_set, batch_size=args.local_bs, shuffle=True)
 poison_samples = int(length / args.num_users) * args.erased_local_r
 
-trigger_label=1
-add_backdoor=0 # =1 add backdoor , !=1 not add
+
+# for normal unlearning test, we need to set add_backdoor !=1
+trigger_label=2
+add_backdoor=1 # =1 add backdoor , !=1 not add
 poison_data, poison_targets = create_backdoor_train_dataset(dataname=args.dataset, train_data=dataset_train,
                                                             base_label=1,
                                                             trigger_label=trigger_label, poison_samples=poison_samples,
@@ -2729,7 +2754,7 @@ erased_loader = DataLoader(erasure_set, batch_size=args.local_bs, shuffle=True)
 
 print()
 print("start train")
-net_glob = FL_train(net_glob, args, dataset_train, dataset_test, dict_users, idxs_local_dict, poison_testset, erased_loader, erased_perm,
+net_glob, running_time_of_one_user_one_round = FL_train(net_glob, args, dataset_train, dataset_test, dict_users, idxs_local_dict, poison_testset, erased_loader, erased_perm,
                     train_type='train')
 
 
@@ -2743,17 +2768,64 @@ unlearn_nips, lr = init_vibi(args.dataset)
 unlearn_nips.to(args.device)
 unlearn_nips.load_state_dict(net_glob.state_dict())
 
-unlearn_nips = unlearning_net_global(unlearn_nips, idxs_local_dict, args, dataset_test, erased_perm, poison_testset,erased_loader)
+unlearn_nips, acc_hbfu, back_acc_hbfu, unl_round = unlearning_net_global(unlearn_nips, idxs_local_dict, args, dataset_test, erased_perm, poison_testset,erased_loader)
 
 
+
+args.local_bs = 20
+
+poison_samples = int(length) * 0.6
+
+
+# for normal unlearning test, we need to set add_backdoor !=1
+trigger_label=2
+add_backdoor=1 # =1 add backdoor , !=1 not add
+poison_data, poison_targets = create_backdoor_train_dataset(dataname=args.dataset, train_data=dataset_train,
+                                                            base_label=1,
+                                                            trigger_label=trigger_label, poison_samples=poison_samples,
+                                                            batch_size=args.local_bs, device=args.device,add_backdoor=add_backdoor)
+
+poison_testset = create_backdoor_test_dataset(dataname=args.dataset, test_data=dataset_test, base_label=1,
+                                              trigger_label=trigger_label, poison_samples=10000, batch_size=args.local_bs,
+                                              device=args.device,add_backdoor=add_backdoor)
+
+poison_data, poison_targets = poison_data.to(args.device), poison_targets.to(args.device)
+
+erasure_set = Data.TensorDataset(poison_data, poison_targets)
+erased_loader = DataLoader(erasure_set, batch_size=args.local_bs, shuffle=True)
 
 print('original model')
-print_multal_info_for_hessian(copy.deepcopy(net_glob).to(args.device), erased_loader,erased_loader, args)
+mi_of_org = print_multal_info_for_hessian(copy.deepcopy(net_glob).to(args.device), erased_loader,erased_loader, args)
 
 
 print('hesian model unlearned')
-print_multal_info_for_hessian(copy.deepcopy(unlearn_nips).to(args.device), erased_loader,erased_loader, args)
+mi_of_hbfu = print_multal_info_for_hessian(copy.deepcopy(unlearn_nips).to(args.device), erased_loader,erased_loader, args)
 
+# print the results about HBFU
+print()
+print("print the results about HBFU")
+print("Mutual information of HBFU:", mi_of_hbfu)
+print("Privacy leak attacks of HBFU:", "attack MSE is achieved on experiment_on_MNIST_for_AE.py") #final_round_mse_on_only_erased_set
+print("Backdoor Acc. of HBFU:", back_acc_hbfu)
+print("Acc. on test dataset of HBFU:", acc_hbfu)
+print("Running time (s) of HBFU:", running_time_of_one_user_one_round * unl_round)
+print("Running time detail:", running_time_of_one_user_one_round , unl_round)
+
+
+
+'''
+On MNIST, EDR = 6%, \\beta = 0.001, SR = 60%
+
+| On MNIST             | Origin      | HBFU     |    VBU   |  MCFU_w  | MCFU_w/o |
+| --------             | --------    | -------- | -------- | -------- | -------- |
+| Mutual information   | 10.59       | 76.05    | 199.53   | 14.65    | 31.33    |
+| Privacy leak attacks | 33.13 (MSE) | 22.78    | 0.00     | 42.91    | 31.22    |
+| Backdoor Acc.        | 100%        | 5.06%    | 2.03%    | 1.19%    | 0.75%    |
+| Acc. on test dataset | 97.35%      | 96.04%   | 88.19%   | 94.81%   | 94.78%   |
+| Running time (s)     | 220         | 12.25    | 0.15     | 2.64     | 2.64     |
+
+
+'''
 
 # print("start unlearn parameter self-sharing")
 # unlearn_self, lr = init_vibi(args.dataset)

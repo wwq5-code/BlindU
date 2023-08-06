@@ -24,7 +24,7 @@ import numpy as np
 from torch.utils.data import DataLoader, Dataset
 import copy
 import random
-
+import time
 
 from torchvision.datasets import CIFAR100
 
@@ -2336,11 +2336,21 @@ def prepare_learning_model(dataloader_full, train_loader, test_loader, dataloade
         # inspect_explanations()
         mu_list = []
         sigma_list = []
+        total_running_time = 0
         for epoch in range(init_epoch, init_epoch + args.num_epochs):
             vibi.train()
             step_start = epoch * len(dataloader_full)
+            start_time = time.time()
             vibi, mu_list, sigma_list = learning_train(dataloader_full, vibi, loss_fn, reconstruction_function, args,
                                                        epoch, mu_list, sigma_list, train_loader, learn_model_type)
+
+            # start_time = time.time()
+            end_time = time.time()
+
+            running_time = end_time - start_time
+            total_running_time += running_time
+            print(f'one big epoch VIB Training took {running_time} seconds')
+
             vibi.eval()
             valid_acc_old = valid_acc
             valid_acc = test_accuracy(vibi, test_loader, args, name='vibi valid top1')
@@ -2352,11 +2362,13 @@ def prepare_learning_model(dataloader_full, train_loader, test_loader, dataloade
             print("backdoor_acc", backdoor_acc)
             acc_test.append(valid_acc)
 
+        print()
+        print("total_training_running time ", total_running_time)
         print('mu', np.mean(mu_list), 'sigma', np.mean(sigma_list))
-        #
+
         final_round_mse = []
         for epoch in range(init_epoch, init_epoch + args.num_epochs):
-            vibi.train()
+            vibi.train()#reconstructor.train()
             step_start = epoch * len(dataloader_erase)
             for step, (x, y) in enumerate(dataloader_erase, start=step_start):
                 x, y = x.to(args.device), y.to(args.device)  # (B, C, H, W), (B, 10)
@@ -2364,7 +2376,7 @@ def prepare_learning_model(dataloader_full, train_loader, test_loader, dataloade
                 logits_z, logits_y, x_hat, mu, logvar = vibi(x, mode='forgetting')  # (B, C* h* w), (B, N, 10)
 
                 logits_z = logits_z.view(logits_z.size(0), 3, 7, 7)
-                x_hat = torch.sigmoid(reconstructor(logits_z))
+                x_hat = torch.sigmoid(reconstructor(logits_z)) #.detach()
                 x_hat = x_hat.view(x_hat.size(0), -1)
                 x = x.view(x.size(0), -1)
                 # x = torch.sigmoid(torch.relu(x))
@@ -2373,7 +2385,7 @@ def prepare_learning_model(dataloader_full, train_loader, test_loader, dataloade
 
                 optimizer_recon.zero_grad()
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(reconstructor.parameters(), 5, norm_type=2.0, error_if_nonfinite=False)
+                torch.nn.utils.clip_grad_norm_(vibi.parameters(), 5, norm_type=2.0, error_if_nonfinite=False)
                 optimizer_recon.step()
 
                 if epoch == args.num_epochs - 1:
@@ -2400,68 +2412,82 @@ def reconstruct_Attack(vibi, reconstructor, reconstruction_function, args, datal
     rec_f2 = nn.MSELoss(size_average=False)
     #
     optimizer = torch.optim.Adam(vibi.parameters(), lr=args.lr)
-    optimizer_recon = torch.optim.Adam(reconstructor.parameters(), lr=args.lr)
+    optimizer_recon = torch.optim.Adam(reconstructor.parameters(), lr=0.001)
+
+    # prepare data
+    temp_img = torch.empty(0, 3, 32, 32).float().cuda()
+    temp_grad = torch.empty(0, 2, 8, 8).long().cuda()
+
+    for step, (x, y) in enumerate(dataloader_erase_single):
+        x, y = x.to(args.device), y.to(args.device)  # (B, C, H, W), (B, 10)
+        # x = x.view(x.size(0), -1)
+        x_in_2_org = torch.cat((x, x))
+        y_in_2 = torch.cat((y, y))
+        logits_z, logits_y, x_hat, mu, logvar = vibi(x_in_2_org, mode='forgetting')  # (B, C* h* w), (B, N, 10)
+
+        H_p_q = loss_fn(logits_y, y_in_2)
+
+        KLD_element = mu.pow(2).add_(logvar.exp()).mul_(-1).add_(1).add_(logvar).cuda()
+        KLD = torch.sum(KLD_element).mul_(-0.5).cuda()
+        KLD_mean = torch.mean(KLD_element).mul_(-0.5).cuda()
+        x_hat = x_hat.view(x_hat.size(0), -1)
+        # print(x_hat.shape)
+        x_in_2 = x_in_2_org.view(x_in_2_org.size(0), -1)
+        BCE = reconstruction_function(x_hat, x_in_2)
+        loss = args.beta * KLD_mean + H_p_q  # args.beta * KLD_mean +
+        # loss = args.beta * KLD_mean + BCE  # / (args.batch_size * 28 * 28)
+
+        optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(vibi.parameters(), 5, norm_type=2.0, error_if_nonfinite=False)
+        # optimizer.step()
+
+        for name, param in vibi.named_parameters():
+            if param.requires_grad:
+                # print(name, param.grad.shape)
+                if name == 'explainer.res_blocks.2.skip.1.bias':  # explainer.linear_head.weight torch.Size([294, 512]) #explainer.res_blocks.7.block.4.weight
+                    fc2_grad = param.grad
+                    fc2_grad = fc2_grad.reshape((1, 2, 8, 8))
+        #                         print(fc2_grad.shape)
+        #                     else:
+        #                         print(name)
+        #         if param.grad == None: continue
+        #         print(name, param.grad.shape)
+        # break
+        fc2_grad_in_2 = torch.cat((fc2_grad, fc2_grad))
+        temp_img = torch.cat([temp_img, x_in_2_org], dim=0)
+        temp_grad = torch.cat([temp_grad, fc2_grad_in_2], dim=0)
+
+    grad_x_dataset = Data.TensorDataset(temp_grad, temp_img)
+    grad_x_loader = DataLoader(grad_x_dataset, batch_size=args.batch_size, shuffle=True)
     final_round_mse = []
+
+    print('finish preparing')
+
     for epoch in range(init_epoch, init_epoch + args.num_epochs):
         vibi.train()
         step_start = epoch * len(dataloader_erase_single)
-        for step, (x, y) in enumerate(dataloader_erase_single, start=step_start):
-            x, y = x.to(args.device), y.to(args.device)  # (B, C, H, W), (B, 10)
+        for step, (grad, x) in enumerate(grad_x_loader, start=step_start):
+            grad, x = grad.to(args.device), x.to(args.device)  # (B, C, H, W), (B, 10)
             # x = x.view(x.size(0), -1)
-            x_in_2 = torch.cat((x,x))
-            y_in_2 = torch.cat((y,y))
-            logits_z, logits_y, x_hat, mu, logvar = vibi(x_in_2, mode='forgetting')  # (B, C* h* w), (B, N, 10)
 
-            H_p_q = loss_fn(logits_y, y_in_2)
-
-            KLD_element = mu.pow(2).add_(logvar.exp()).mul_(-1).add_(1).add_(logvar).cuda()
-            KLD = torch.sum(KLD_element).mul_(-0.5).cuda()
-            KLD_mean = torch.mean(KLD_element).mul_(-0.5).cuda()
-            x_hat = x_hat.view(x_hat.size(0), -1)
-            # print(x_hat.shape)
-            x_in_2 = x_in_2.view(x_in_2.size(0), -1)
-            BCE = reconstruction_function(x_hat, x_in_2)
-            loss = args.beta * KLD_mean + H_p_q  # args.beta * KLD_mean +
-            #loss = args.beta * KLD_mean + BCE  # / (args.batch_size * 28 * 28)
-
-            optimizer.zero_grad()
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(vibi.parameters(), 5, norm_type=2.0, error_if_nonfinite=False)
-            # optimizer.step()
-
-            for name, param in vibi.named_parameters():
-                if param.requires_grad:
-                    # print(name, param.grad.shape)
-                    if name == 'explainer.res_blocks.2.skip.1.bias': #explainer.linear_head.weight torch.Size([294, 512]) #explainer.res_blocks.7.block.4.weight
-                        fc2_grad = param.grad
-                        fc2_grad = fc2_grad.reshape((1, 2, 8, 8))
-#                         print(fc2_grad.shape)
-#                     else:
-#                         print(name)
-            #         if param.grad == None: continue
-            #         print(name, param.grad.shape)
-            # break
-
-            logits_z1 = logits_z.view(logits_z.size(0), 3, 7, 7)
-
-            fc2_grad_in_2 = torch.cat((fc2_grad, fc2_grad))
             #x_hat = torch.sigmoid(reconstructor(logits_z1.detach())) #logits_z2, fc2_grad_in_2
-            logits_z, logits_y, x_hat, mu, logvar = reconstructor(logits_z1.detach(), mode='forgetting')
+            x_hat = torch.sigmoid(reconstructor(grad))
             # torch.sigmoid(reconstructor(logits_z))
             x_hat = x_hat.view(x_hat.size(0), -1)
             # print(x_hat.shape)
-            # x = x_in_2.view(x_in_2.size(0), -1)
+            x = x.view(x.size(0), -1)
             # x = torch.sigmoid(torch.relu(x))
-            BCE = reconstruction_function(x_hat, x_in_2)  # mse loss
-            loss2 = BCE
+            BCE = reconstruction_function(x_hat, x)  # mse loss
+            loss2 = BCE/(20 * 32 * 32 * 3) * 20
 
             optimizer_recon.zero_grad()
             loss2.backward()
             torch.nn.utils.clip_grad_norm_(reconstructor.parameters(), 5, norm_type=2.0, error_if_nonfinite=False)
             optimizer_recon.step()
-            MSE = rec_f2(x_hat, x_in_2)
+            MSE = rec_f2(x_hat, x)
 
-            if epoch == args.num_epochs - 1:
+            if epoch == init_epoch + args.num_epochs - 1:
                 final_round_mse.append(MSE.item())
             if step % len(train_loader) % 600 == 0:
                 print('epoch: ',epoch,"loss", loss.item(),"loss2", loss2.item(), 'BCE', BCE.item())
@@ -2525,7 +2551,7 @@ args.model = 'z_linear'
 args.local_bs = 100  #small batch_size has a better performance
 args.local_ep = 10
 args.num_epochs = 20
-args.total_batch_round = 600
+# args.total_batch_round = 600
 args.dataset = 'CIFAR100'
 args.xpl_channels = 1
 args.epochs = int(10)
@@ -2742,29 +2768,32 @@ loss_fn = nn.CrossEntropyLoss()
 
 
 
-# #this is used to test reconstructed attack, if we normal train, we do not need run this part
-# reconstructor_grad, lr = init_vibi('for_reconstruction') # resnet18(3, 3 * 32 * 32)  #LinearModel(n_feature=96*args.dimZ*2, n_output=28 * 28)
-# #reconstructor_grad = LinearModel(n_feature=512, n_output=3*32 * 32)
-# reconstructor_grad = reconstructor_grad.to(device)
-# # vibi_train_for_inf, lr = init_vibi(args.dataset)
-# dataloader_erase_single = DataLoader(erasing_set, batch_size=1, shuffle=True)
-# test_loader_single = DataLoader(test_set, batch_size=1, shuffle=False, num_workers=1)
-# reconstruction_function = nn.MSELoss(size_average=False)
-# reconstructor_grad = reconstruct_Attack(copy.deepcopy(vibi).to(args.device), reconstructor_grad, reconstruction_function, args, dataloader_erase_single, test_loader_single)
 
 
-
-learn_model_type = 'nips'
-vibi_for_nips = prepare_learning_model(dataloader_full, train_loader, test_loader, dataloader_erase, dataloader_remain, logs, reconstructor, reconstruction_function, optimizer_recon, explainer_type, init_epoch, loss_fn, args,valid_acc,  learn_model_type)
-
-print('vibi_for_nips mutual info')
-print_multal_info(vibi_for_nips, dataloader_erase,dataloader_erase, args)
+# learn_model_type = 'nips'
+# vibi_for_nips = prepare_learning_model(dataloader_full, train_loader, test_loader, dataloader_erase, dataloader_remain, logs, reconstructor, reconstruction_function, optimizer_recon, explainer_type, init_epoch, loss_fn, args,valid_acc,  learn_model_type)
+#
+# print('vibi_for_nips mutual info')
+# print_multal_info(vibi_for_nips, dataloader_erase,dataloader_erase, args)
 
 
 
 learn_model_type = 'vib'
 vibi = prepare_learning_model(dataloader_full, train_loader, test_loader, dataloader_erase, dataloader_remain, logs, reconstructor, reconstruction_function, optimizer_recon, explainer_type, init_epoch, loss_fn, args, valid_acc,  learn_model_type)
 
+
+
+
+# # reconstruct_Attack()
+# #this is used to test reconstructed attack, if we normal train, we do not need run this part
+# reconstructor_grad  =  resnet18(2, 3 * 32 * 32) #init_vibi('FORREC') # resnet18(3, 3 * 32 * 32)  #LinearModel(n_feature=96*args.dimZ*2, n_output=28 * 28)
+# #reconstructor_grad = LinearModel(n_feature=512, n_output=3*32 * 32)
+# reconstructor_grad = reconstructor_grad.to(device)
+# vibi_train_for_inf, lr = init_vibi(args.dataset)
+# dataloader_erase_single = DataLoader(erasing_set, batch_size=1, shuffle=True)
+# test_loader_single = DataLoader(test_set, batch_size=1, shuffle=False, num_workers=1)
+# reconstruction_function = nn.MSELoss(size_average=False)
+# reconstructor_grad = reconstruct_Attack(copy.deepcopy(vibi_train_for_inf).to(args.device), reconstructor_grad, reconstruction_function, args, dataloader_erase_single, test_loader_single)
 
 
 print()
@@ -2864,7 +2893,7 @@ print_multal_info(copy.deepcopy(vibi).to(args.device), dataloader_erase,dataload
 
 
 # print('vibi_for_nips mutual info')
-# print_multal_info(vibi_for_nips, dataloader_erase,dataloader_erase, args)
+# print_multal_info(vibi_flearning_trainor_nips, dataloader_erase,dataloader_erase, args)
 #
 # print('vibi_f_nipsu mutual info')
 # print_multal_info(vibi_f_nipsu, dataloader_erase,dataloader_erase, args)
