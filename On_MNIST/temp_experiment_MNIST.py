@@ -2945,7 +2945,7 @@ print_multal_info(vibi_f_frkl_sampled, dataloader_erase, dataloader_erase, args)
 
 On MNIST, EDR = 6%, \\beta = 0.001, SR = 60%
 
-| On MNIST             | Origin      | HBFU     |    VBU   |  MCFU_w  | MCFU_w/o |
+| On MNIST             | Origin      | HBFU     |    VBU   |  SMU_w  | SMU_w/o |
 | --------             | --------    | -------- | -------- | -------- | -------- |
 | Mutual information   | 10.59       | 76.05    | 199.53   | 14.65    | 31.33    |
 | Privacy leak attacks | 33.13 (MSE) | 22.78    | 0.00     | 42.91    | 31.22    |

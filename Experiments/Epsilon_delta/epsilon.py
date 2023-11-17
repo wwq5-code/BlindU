@@ -27,15 +27,19 @@ for i in range(len(x)):
 print(with_replacement)
 print(without_replacement)
 
-plt.figure()
-l_w=5
-m_s=12
-#plt.figure(figsize=(8, 5.3))
-#plt.plot(x, unl_fr, color='blue', marker='^', label='Retrain',linewidth=l_w, markersize=m_s)
-plt.plot(x, with_replacement, color='dodgerblue',  marker='o', linestyle='-.', label='w replacement',linewidth=l_w, markersize=m_s)
-#plt.plot(x, without_replacement, color='palegreen',  marker='1',  label='RFU-SS',linewidth=l_w, markersize=m_s)
+plt.figure(figsize=(6, 5))
+l_w = 5
+m_s = 12
+marker_s = 3
+markevery = 1
+# plt.figure(figsize=(8, 5.3))
+# plt.plot(x, unl_fr, color='blue', marker='^', label='Retrain',linewidth=l_w, markersize=m_s)
+plt.plot(x, with_replacement, linestyle='-', color='b', marker='o', fillstyle='none', markevery=markevery,
+         label='w replacement', linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
+# plt.plot(x, without_replacement, color='palegreen',  marker='1',  label='RFU-SS',linewidth=l_w, markersize=m_s)
 
-plt.plot(x, without_replacement, color='orange',  marker='x', linestyle='--', label='w/o replacement',linewidth=l_w,  markersize=m_s)
+plt.plot(x, without_replacement, linestyle='--', color='g', marker='s', fillstyle='none', markevery=markevery,
+         label='w/o replacement', linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
 #plt.plot(x, unl_hess_r, color='r',  marker='p',  label='HBU',linewidth=l_w, markersize=m_s)
 
@@ -48,7 +52,7 @@ plt.plot(x, without_replacement, color='orange',  marker='x', linestyle='--', la
 # plt.plot(x, y_ma05, color='cyan',  marker='p',  label='FedMC A_acc, pr=0.5',linewidth=3, markersize=8)
 
 
-# plt.grid()
+plt.grid()
 leg = plt.legend(fancybox=True, shadow=True)
 # plt.xlabel('Malicious Client Ratio (%)' ,fontsize=16)
 plt.ylabel('$\\epsilon$' ,fontsize=20)
@@ -58,6 +62,8 @@ plt.xlabel('$\it{SR}$' ,fontsize=20)
 
 plt.xticks(x, labels, fontsize=20)
 # plt.title('CIFAR10 IID')
+
+plt.title('(a) $\\epsilon$ of different $\it{SR}$', fontsize=20)
 plt.legend(loc='best',fontsize=20)
 plt.tight_layout()
 #plt.title("MNIST")

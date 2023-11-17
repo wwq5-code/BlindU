@@ -66,9 +66,9 @@ for i in range(150):
 
 plt.figure()
 lw=3
-plt.plot(x, y_vibu_ss_acc_list, color='g', linestyle='-',  label='MCFU',linewidth=lw, markersize=10)
+plt.plot(x, y_vibu_ss_acc_list, color='g', linestyle='-',  label='SMU',linewidth=lw, markersize=10)
 # #plt.plot(x, y_fkl, color='g',  marker='+',  label='VRFL')
-plt.plot(x, y_vibu_ss_b_acc_list, color='orange', linestyle=(0,(3,1,1,1)),  label='MCFU (Er.)',linewidth=lw, markersize=10)
+plt.plot(x, y_vibu_ss_b_acc_list, color='orange', linestyle=(0,(3,1,1,1)),  label='SMU (Er.)',linewidth=lw, markersize=10)
 # #plt.plot(x, y_fkl, color='g',  marker='+',  label='VRFL')
 
 plt.plot(x, y_vbu_acc_list, color='tan', linestyle='--',   label='VBU',linewidth=lw,  markersize=10)

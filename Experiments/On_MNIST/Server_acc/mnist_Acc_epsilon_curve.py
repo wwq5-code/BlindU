@@ -23,17 +23,27 @@ unl_ss_wo = [94.71, 93.83, 94.78, 94.07, 93.87]
 
 
 
-plt.figure()
+
+plt.figure(figsize=(5.5, 5.3))
 l_w=5
 m_s=15
+marker_s = 3
+markevery=1
 #plt.figure(figsize=(8, 5.3))
 #plt.plot(x, unl_fr, color='blue', marker='^', label='Retrain',linewidth=l_w, markersize=m_s)
-plt.plot(x, unl_ss_w, color='g',  marker='*',  label='MCFU$_{w}$',linewidth=l_w, markersize=m_s)
-plt.plot(x, unl_ss_wo, color='palegreen',  marker='1',  label='MCFU$_{w/o}$',linewidth=l_w, markersize=m_s)
+plt.plot(x, unl_ss_w, linestyle='-', color='b', marker='o', fillstyle='none', markevery=markevery,
+         label='SMU$_{w}$', linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
-plt.plot(x, unl_vbu, color='orange',  marker='x',  label='VBU',linewidth=l_w,  markersize=m_s)
+#plt.plot(x, unl_ss_w, color='g',  marker='*',  label='SMU$_{w}$',linewidth=l_w, markersize=m_s)
+plt.plot(x, unl_ss_wo, linestyle='--', color='g',  marker='s', fillstyle='none', markevery=markevery,
+         label='SMU$_{w/o}$',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
-plt.plot(x, unl_hess_r, color='r',  marker='p',  label='HBFU',linewidth=l_w, markersize=m_s)
+plt.plot(x, unl_vbu, linestyle=':', color='r',  marker='^', fillstyle='none', markevery=markevery,
+         label='VBU', linewidth=l_w,  markersize=m_s, markeredgewidth=marker_s)
+
+plt.plot(x, unl_hess_r, linestyle='-.', color='k',  marker='D', fillstyle='none', markevery=markevery,
+         label='HBFU',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
+
 
 
 #plt.plot(x, unl_vibu, color='silver',  marker='d',  label='VIBU',linewidth=4,  markersize=10)
@@ -44,16 +54,18 @@ plt.plot(x, unl_hess_r, color='r',  marker='p',  label='HBFU',linewidth=l_w, mar
 # plt.plot(x, y_ma05, color='cyan',  marker='p',  label='FedMC A_acc, pr=0.5',linewidth=3, markersize=8)
 
 
-# plt.grid()
+plt.grid()
 leg = plt.legend(fancybox=True, shadow=True)
 # plt.xlabel('Malicious Client Ratio (%)' ,fontsize=16)
-plt.ylabel('Accuracy (%)', fontsize=20)
+plt.ylabel('Accuracy (%)', fontsize=24)
 my_y_ticks = np.arange(80, 101, 5)
 plt.yticks(my_y_ticks, fontsize=20)
 plt.xlabel('$\it{SR}$', fontsize=20)
 
 plt.xticks(x, labels, fontsize=20)
 # plt.title('CIFAR10 IID')
+
+plt.title('(c) Utility Preservation', fontsize=24)
 plt.legend(loc='best', fontsize=20)
 plt.tight_layout()
 #plt.title("MNIST")

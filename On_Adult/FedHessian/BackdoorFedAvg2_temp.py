@@ -3031,7 +3031,7 @@ print("time detail", running_time_of_one_user_one_round , unl_round)
 '''
 On Adult, EDR = 6%, \\beta = 0.001, SR = 60%
 
-| On Adult             | Origin       | HBFU     |    VBU   |  MCFU_w  | MCFU_w/o |
+| On Adult             | Origin       | HBFU     |    VBU   |  SMU_w  | SMU_w/o |
 | --------             | --------     | -------- | -------- | -------- | -------- |
 | Mutual information   | 2.14         | 3.66     | 10.99    | 3.48     | 2.74     |
 | Privacy leak attacks | 90.76% (Acc.)| 96.80%   | 99.99%   | 57.68%   | 59.16%   |

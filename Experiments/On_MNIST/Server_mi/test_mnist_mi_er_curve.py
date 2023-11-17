@@ -12,16 +12,17 @@ x=[1, 2, 3, 4, 5]
 # attack_for_plt=[0, 0.3524, 0, 0.1762, 0.1762]
 # basic_for_plt=[99.8, 99.8, 99.8, 99.8, 99.8]
 
-labels = ['0.0001', '0.001', '0.01', '0.1', '1' ]
-unl_org_0= [62.36, 26.76, 17.664, 5.737, 3.64]
-unl_org = [182.17, 199.2, 183.12, 128.49, 203.3]
+labels = ['2%', '4%', '6%', '8%', '10%' ]
+unl_org_0= [24.44, 33.15, 26.5, 31.84, 47.90]
+unl_org = [164.16, 146.299, 199.28, 169.436, 129.61]
 
 
-unl_hess_r = [76.05, 76.05, 76.05, 76.05, 76.05]
-unl_vbu = [199.53, 199.53, 199.53, 199.53, 199.53]
+unl_hess_r = [78.16, 64.299, 76.05, 69.436, 69.45]
+unl_vbu = [164.16, 146.299, 199.28, 167.86, 129.61]
 
-unl_ss_w = [35.51, 14.6, 6.65, 1.53, 0.658]
-unl_ss_wo = [47.961, 31.33, 11.943, 2.402, 0.95]
+unl_ss_w = [17.6, 18.12, 14.657, 18.06, 20.63]
+unl_ss_wo = [23.54, 19.375, 31.33, 33.92, 37.80]
+
 
 
 plt.figure(figsize=(5.5, 5.3))
@@ -44,6 +45,7 @@ plt.plot(x, unl_vbu, linestyle=':', color='r',  marker='^', fillstyle='none', ma
 plt.plot(x, unl_hess_r, linestyle='-.', color='k',  marker='D', fillstyle='none', markevery=markevery,
          label='HBFU',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
+
 #plt.plot(x, unl_vibu, color='silver',  marker='d',  label='VIBU',linewidth=4,  markersize=10)
 
 # plt.plot(x, y_sa03, color='r',  marker='2',  label='AAAI21 A_acc, pr=0.3',linewidth=3, markersize=8)
@@ -55,23 +57,23 @@ plt.plot(x, unl_hess_r, linestyle='-.', color='k',  marker='D', fillstyle='none'
 plt.grid()
 leg = plt.legend(fancybox=True, shadow=True)
 # plt.xlabel('Malicious Client Ratio (%)' ,fontsize=16)
-plt.ylabel('Mutual Information' ,fontsize=24)
+plt.ylabel('Mutual Information (MI)' ,fontsize=20)
 my_y_ticks = np.arange(0 ,201,40)
 plt.yticks(my_y_ticks,fontsize=20)
-plt.xlabel('$\\beta$' ,fontsize=20)
+plt.xlabel('$\it{EDR}$' ,fontsize=20)
 
 plt.xticks(x, labels, fontsize=20)
+plt.title('(a) Privacy Preservation', fontsize=20)
 # plt.title('CIFAR10 IID')
-plt.title('(a) Privacy Preservation', fontsize=24)
-
 plt.legend(loc='best',fontsize=20)
 plt.tight_layout()
 #plt.title("MNIST")
+
 plt.rcParams['figure.figsize'] = (2.0, 1)
 plt.rcParams['image.interpolation'] = 'nearest'
 plt.rcParams['figure.subplot.left'] = 0.11
 plt.rcParams['figure.subplot.bottom'] = 0.08
 plt.rcParams['figure.subplot.right'] = 0.977
 plt.rcParams['figure.subplot.top'] = 0.969
-plt.savefig('mnist_mi_beta_curve.png', dpi=200)
+plt.savefig('Ieee_style_mnist_mi_er_curve.png', dpi=200)
 plt.show()

@@ -2878,7 +2878,7 @@ print('time detail',running_time_of_one_user_one_round,unl_round)
 '''
 On CIFAR100, EDR = 6%, \\beta = 0.01, SR = 60%
 
-| On CIFAR100          | Origin      | HBFU     |    VBU   |  MCFU_w  | MCFU_w/o |
+| On CIFAR100          | Origin      | HBFU     |    VBU   |  SMU_w  | SMU_w/o |
 | --------             | --------    | -------- | -------- | -------- | -------- |
 | Mutual information   | 3.26        | 4.77     | 76.71    | 4.583    | 6.023    |
 | Privacy leak attacks | 82.09 (MSE) | 48.00    | 0.00     | 428.85   | 391.49   |

@@ -23,10 +23,11 @@ width = 0.6  # the width of the bars
 plt.figure()
 #plt.subplots(figsize=(8, 5.3))
 #plt.bar(x - width / 2 - width / 8 + width / 8, unl_fr, width=0.168, label='Retrain', color='dodgerblue', hatch='/')
-plt.bar(x - width / 2 - width / 8 + width / 8 , unl_br, width=0.168, label='VBU', color='orange', hatch='\\')
-plt.bar(x - width / 8 - width / 16, unl_vib, width=0.168, label='MCFU$_{w}$', color='palegreen', hatch='/')
-plt.bar(x + width / 8, unl_self_r, width=0.168, label='MCFU$_{w/o}$', color='g', hatch='x')
-plt.bar(x + width / 2 - width / 8 + width / 16, unl_hess_r, width=0.168, label='HBFU', color='tomato', hatch='-')
+plt.bar(x - width / 2 - width / 8 + width / 8 , unl_br,   width=0.168, label='VBU', color='r', hatch='/')
+plt.bar(x - width / 8 - width / 16, unl_vib, width=0.168, label='SMU$_{w}$', color='cornflowerblue', hatch='*')
+plt.bar(x + width / 8, unl_self_r, width=0.168, label='SMU$_{w/o}$', color='g', hatch='x')
+plt.bar(x + width / 2 - width / 8 + width / 16, unl_hess_r, width=0.168, label='HBFU', color='orange', hatch='\\')
+
 
 
 # plt.bar(x - width / 2.5 ,  unl_br, width=width/3, label='VBU', color='orange', hatch='\\')
@@ -44,6 +45,7 @@ my_y_ticks = np.arange(0, 66.1, 10)
 plt.yticks(my_y_ticks, fontsize=20)
 # ax.set_yticklabels(my_y_ticks,fontsize=15)
 
+plt.grid(axis='y')
 plt.legend(loc='upper left', fontsize=20)
 plt.xlabel('$\it{EDR}$' ,fontsize=20)
 # ax.bar_label(rects1, padding=1)

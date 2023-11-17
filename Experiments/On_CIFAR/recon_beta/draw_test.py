@@ -27,7 +27,7 @@ unl_ss_wo = [356.19, 368.983, 368.199, 368.03, 357.17]
 
 
 
-fig, ax = plt.subplots(figsize=(7, 5))
+fig, ax = plt.subplots(figsize=(6.5, 5))
 
 
 # for x, y in zip(x_coords, unl_org_0):
@@ -61,18 +61,21 @@ ax.imshow(image, extent=[x_coords[4]-2*index_change/5*4-0.05, x_coords[4]-0.05 ,
 
 l_w=5
 m_s=10
-
+marker_s = 3
+markevery=1
 # ax.scatter(x_coords, unl_org_0, marker='p', color='blue', zorder=20)
-ax.scatter(x_coords, unl_ss_wo, marker='.', color='orange', zorder=2)
+ax.scatter(x_coords, unl_ss_w, marker='.', color='orange', zorder=2)
 # ax.plot(x_coords, unl_ss_w, color='blue', zorder=3)
+ax.plot(x_coords, unl_ss_w, color='dodgerblue',  marker='^', fillstyle='none',linestyle=(0,(2,1,1,1)), label='SMU$_{w}$',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
-ax.plot(x_coords, unl_ss_w, color='limegreen',  marker='^', linestyle=(0,(2,1,1,1)), label='MCFU$_{w}$',linewidth=l_w, markersize=m_s)
+ax.plot(x_coords, unl_ss_wo, color='limegreen',  marker='D', fillstyle='none', linestyle='--', label='SMU$_{w/o}$',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
-ax.plot(x_coords, unl_ss_wo, color='orange',  marker='D', linestyle='--', label='MCFU$_{w/o}$',linewidth=l_w, markersize=m_s)
 
-ax.plot(x_coords, unl_hess_r, color='dodgerblue',  marker='o', linestyle='-.', label='Grad. (HBFU)',linewidth=l_w, markersize=m_s)
+ax.plot(x_coords, unl_hess_r, color='orange',  marker='o',fillstyle='none', linestyle='-.', label='Grad. (HBFU)',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
-ax.plot(x_coords, unl_org_0, color='r',  marker='p',  label='Orig. Image (VBU)',linewidth=l_w, markersize=m_s)
+
+ax.plot(x_coords, unl_org_0, color='orangered',  marker='p', fillstyle='none', label='Orig. Image (VBU)',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
+
 
 y_coords = [-10,10,20,30,500]
 x1=[2,2,2,2,2]
