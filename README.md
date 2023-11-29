@@ -1,11 +1,9 @@
-# SMU
+# PriMU
 
-# Secure Machine Unlearning (SMU) against Erasing Data Exposure
+# Privacy-Preserving Machine Unlearning (PriMU) against Erasing Data Exposure
 
 ## Overview
-This repository is the official implementation of SMU, and the corresponding paper is under review.
-
-We compress the whole project and add the MU_no_sharing_raw.zip file for Artifact Evaluation. 
+This repository is the official implementation of PriMU, and the corresponding paper is under review.
 
 
 ## Prerequisites
@@ -31,7 +29,7 @@ Evaluated on 1080ti GPUs,
 
 On MNIST, EDR = 6%, \beta = 0.001, SR = 60%
 
-| On MNIST             | Origin      | HBFU     |    VBU   |  SMU_w  | SMU_w/o |
+| On MNIST             | Origin      | HBFU     |    VBU   |  PriMU_w  | PriMU_w/o |
 | --------             | --------    | -------- | -------- | -------- | -------- |
 | Mutual information   | 10.59       | 76.05    | 199.53   | 14.65    | 31.33    |
 | Privacy leak attacks | 33.13 (MSE) | 22.78    | 0.00     | 42.91    | 31.22    |
@@ -47,11 +45,11 @@ We also collect these metric values and print them at the end of the code printi
 Here, we explain the meaning of each metric. The Mutual information (MI) metric means the mutual information between the original samples and the representation. The lower MI means lesser information contained in the representation, ensuring better privacy protection. The Privacy leak attacks metric means the reconstruction attacks on the image dataset. A higher reconstruction MSE means the attacker is harder to recover the image from the representation.
 The backdoor accuracy metric shows the effect of unlearning the backdoored samples. A lower backdoor accuracy means the method unlearns the erased samples better. The accuracy on the test dataset metric means the model accuracy after unlearning. A higher model accuracy means a better model accuracy preservation of the unlearning method. The running time is the training time of the unlearning methods.
 
-From the privacy protection perspective, SMU_w and SMU_w/o achieve better privacy protection, lower MI and higher attacking MSE.
-From the unlearning effectiveness perspective, SMU_w and SMU_w/o achieve a lower backdoor accuracy (good backdoor elimination) and higher model accuracy than VBU, similar model accuracy to HBFU.
+From the privacy protection perspective, PriMU_w and PriMU_w/o achieve better privacy protection, lower MI and higher attacking MSE.
+From the unlearning effectiveness perspective, PriMU_w and PriMU_w/o achieve a lower backdoor accuracy (good backdoor elimination) and higher model accuracy than VBU, similar model accuracy to HBFU.
 From the running time perspective, VBU achieves the best efficiency and HBFU consumes the most running time.
 
-1. To run the SMU on MNIST, we can run
+1. To run the PriMU on MNIST, we can run
 ```
 python /On_MNIST/experiment_on_MNIST_for_AE.py --gpu 0 --num_users 10 --dataset MNIST --local_bs 20 --num_epochs 20 --beta 0.001 --lr 0.001 --max_norm 1 --erased_portion 0.3 --erased_local_r 0.06 --epsilon 1.0 --dp_sampling_rate 0.601 --dimZ 49 --unlearning_learning_rate 1 -- mi_rate 4 --mi_epoch 40 --reverse_rate 0.5 --kld_r 1.0 --unl_conver_r 2 --hessian_rate 0.00005
 ```
@@ -65,7 +63,7 @@ python /On_MNIST/FedHessian/backdoor_FedHessian2.py
 
 On CIFAR10, EDR = 6%, \beta = 0.01, SR = 60%
 
-| On CIFAR10           | Origin      | HBFU     |    VBU   |  SMU_w  | SMU_w/o |
+| On CIFAR10           | Origin      | HBFU     |    VBU   |  PriMU_w  | PriMU_w/o |
 | --------             | --------    | -------- | -------- | -------- | -------- |
 | Mutual information   | 3.02        | 6.93     | 117.65   | 5.37     | 7.19     |
 | Privacy leak attacks | 74.63 (MSE) | 57.76    | 0.00     | 421.9    | 376.2    |
@@ -78,7 +76,7 @@ We collect almost all metric values and print these values at the end of '/On_CI
 Partial results about HBFU can be achieved using '/On_CIFAR/FedHessian/hessian_cifar_temp.py'.
 We also collect these metric values and print them at the end of the code printing.
 
-3. To run the SMU on CIFAR10, we can run
+3. To run the PriMU on CIFAR10, we can run
 ```
 python /On_CIFAR/experiments_on_cifar_for_AE.py --gpu 0 --num_users 10 --dataset CIFAR10 --local_bs 100 --num_epochs 20 --beta 0.01 --lr 0.0005 --max_norm 1 --erased_portion 0.3 --erased_local_r 0.06 --epsilon 1.0 --dp_sampling_rate 0.601 --dimZ 49 --unlearning_learning_rate 1 -- mi_rate 4 --mi_epoch 40 --reverse_rate 0.1 --kld_r 1.0 --unl_conver_r 2 --hessian_rate 0.000000005
 ```
@@ -92,7 +90,7 @@ python /On_CIFAR/FedHessian/hessian_cifar_temp.py
 
 On Adult, EDR = 6%, \beta = 0.001, SR = 60%
 
-| On Adult             | Origin       | HBFU     |    VBU   |  SMU_w  | SMU_w/o |
+| On Adult             | Origin       | HBFU     |    VBU   |  PriMU_w  | PriMU_w/o |
 | --------             | --------     | -------- | -------- | -------- | -------- |
 | Mutual information   | 2.14         | 3.66     | 10.99    | 3.48     | 2.74     |
 | Privacy leak attacks | 90.76% (Acc.)| 96.80%   | 99.99%   | 57.68%   | 59.16%   |
@@ -106,7 +104,7 @@ Partial results about HBFU can be achieved using '/On_Adult/FedHessian/BackdoorF
 We also collect these metric values and print them at the end of the code printing.
 
 
-5. To run the SMU on Adult, we can run
+5. To run the PriMU on Adult, we can run
 ```
 python /On_Adult/experiments_on_adult_for_AE.py
 ```
@@ -124,7 +122,7 @@ python /On_Adult/FedHessian/BackdoorFedAvg2_temp.py
 
 On MNIST, EDR = 6%, \beta = 0.001, SR = 60%
 
-| On MNIST             | Origin      | HBFU     |    VBU   |  SMU_w  | SMU_w/o |
+| On MNIST             | Origin      | HBFU     |    VBU   |  PriMU_w  | PriMU_w/o |
 | --------             | --------    | -------- | -------- | -------- | -------- |
 | Mutual information   | 9.72        | 78.58    | 179.50   | 27.98    | 38.68    |
 | Privacy leak attacks | 32.47 (MSE) | 21.82    | 0.00     | 37.99    | 27.41    |
@@ -134,7 +132,7 @@ On MNIST, EDR = 6%, \beta = 0.001, SR = 60%
 
 This table contains similar results as the former table about MNIST but is evaluated on the P100 GPU
 
-1. To run the SMU on MNIST, we can run
+1. To run the PriMU on MNIST, we can run
 ```
 python /On_MNIST/experiment_on_MNIST_for_AE.py --gpu 0 --num_users 10 --dataset MNIST --local_bs 20 --num_epochs 20 --beta 0.001 --lr 0.001 --max_norm 1 --erased_portion 0.3 --erased_local_r 0.06 --epsilon 1.0 --dp_sampling_rate 0.601 --dimZ 49 --unlearning_learning_rate 1 -- mi_rate 4 --mi_epoch 40 --reverse_rate 0.5 --kld_r 1.0 --unl_conver_r 2 --hessian_rate 0.00005
 ```
@@ -148,7 +146,7 @@ python /On_MNIST/FedHessian/backdoor_FedHessian2.py
 
 On CIFAR10, EDR = 6%, \beta = 0.01, SR = 60%
 
-| On CIFAR10           | Origin      | HBFU     |    VBU   |  SMU_w  | SMU_w/o |
+| On CIFAR10           | Origin      | HBFU     |    VBU   |  PriMU_w  | PriMU_w/o |
 | --------             | --------    | -------- | -------- | -------- | -------- |
 | Mutual information   | 2.42        | 6.42     | 89.39    | 5.19     | 5.77     |
 | Privacy leak attacks | 58.70 (MSE) | 44.45    | 0.00     | 418.46   | 368.19   |
@@ -158,7 +156,7 @@ On CIFAR10, EDR = 6%, \beta = 0.01, SR = 60%
 
 This table contains similar results as the former table about CIFAR10 but is evaluated on the P100 GPU
 
-3. To run the SMU on CIFAR10, we can run
+3. To run the PriMU on CIFAR10, we can run
 ```
 python /On_CIFAR/experiments_on_cifar_for_AE.py --gpu 0 --num_users 10 --dataset CIFAR10 --local_bs 100 --num_epochs 20 --beta 0.01 --lr 0.0005 --max_norm 1 --erased_portion 0.3 --erased_local_r 0.06 --epsilon 1.0 --dp_sampling_rate 0.601 --dimZ 49 --unlearning_learning_rate 1 -- mi_rate 4 --mi_epoch 40 --reverse_rate 0.1 --kld_r 1.0 --unl_conver_r 2 --hessian_rate 0.000000005
 ```
@@ -172,7 +170,7 @@ python /On_CIFAR/FedHessian/hessian_cifar_temp.py
 
 On CIFAR100, EDR = 6%, \beta = 0.01, SR = 60%
 
-| On CIFAR100          | Origin      | HBFU     |    VBU   |  SMU_w  | SMU_w/o |
+| On CIFAR100          | Origin      | HBFU     |    VBU   |  PriMU_w  | PriMU_w/o |
 | --------             | --------    | -------- | -------- | -------- | -------- |
 | Mutual information   | 3.26        | 4.77     | 76.71    | 4.583    | 6.023    |
 | Privacy leak attacks | 82.09 (MSE) | 48.00    | 0.00     | 428.85   | 391.49   |
@@ -182,7 +180,7 @@ On CIFAR100, EDR = 6%, \beta = 0.01, SR = 60%
 
 This table contains the results on CIFAR100 using a P100 GPU.
 
-7. To run the SMU on CIFAR100, we can run
+7. To run the PriMU on CIFAR100, we can run
 ```
 python /On_CIFAR100/experiments_on_cifar100_for_AE.py
 ```

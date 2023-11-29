@@ -18,8 +18,8 @@ unl_org = [99.99, 99.99, 99.99, 99.99, 99.96]
 unl_hess_r = [6.2, 6.2, 6.2, 6.2, 6.2]
 unl_vbu = [7.9,    7.9, 7.9, 7.9, 7.9]
 
-unl_ss_w = [5.56,   6.48, 7.216, 7.0, 5.5]
-unl_ss_wo = [7.4,   7.4, 6.084, 4.52, 1.9]
+unl_ss_w = [5.5, 6.0, 7.216, 7.4,   7.4]
+unl_ss_wo = [4.9, 5.52, 6.084,  6.56,   6.48 ]
 
 
 
@@ -32,11 +32,11 @@ markevery=1
 #plt.figure(figsize=(8, 5.3))
 #plt.plot(x, unl_fr, color='blue', marker='^', label='Retrain',linewidth=l_w, markersize=m_s)
 plt.plot(x, unl_ss_w, linestyle='-', color='b', marker='o', fillstyle='none', markevery=markevery,
-         label='SMU$_{w}$', linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
+         label='PriMU$_{w}$', linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
-#plt.plot(x, unl_ss_w, color='g',  marker='*',  label='SMU$_{w}$',linewidth=l_w, markersize=m_s)
+#plt.plot(x, unl_ss_w, color='g',  marker='*',  label='PriMU$_{w}$',linewidth=l_w, markersize=m_s)
 plt.plot(x, unl_ss_wo, linestyle='--', color='g',  marker='s', fillstyle='none', markevery=markevery,
-         label='SMU$_{w/o}$',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
+         label='PriMU$_{w/o}$',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
 plt.plot(x, unl_vbu, linestyle=':', color='r',  marker='^', fillstyle='none', markevery=markevery,
          label='VBU', linewidth=l_w,  markersize=m_s, markeredgewidth=marker_s)
@@ -68,7 +68,7 @@ plt.xlabel('$\\beta$' ,fontsize=20)
 plt.xticks(x, labels, fontsize=20)
 # plt.title('CIFAR10 IID')
 
-plt.title('(b) Unlearning Effectiveness', fontsize=24)
+plt.title('(h) Unlearning Effectiveness', fontsize=24)
 plt.legend(loc='best',fontsize=20)
 plt.tight_layout()
 #plt.title("MNIST")
@@ -78,5 +78,5 @@ plt.rcParams['figure.subplot.left'] = 0.11
 plt.rcParams['figure.subplot.bottom'] = 0.08
 plt.rcParams['figure.subplot.right'] = 0.977
 plt.rcParams['figure.subplot.top'] = 0.969
-plt.savefig('cifar100_backacc_beta_curve.png', dpi=200)
+plt.savefig('cifar100_backacc_beta_curve.pdf', format='pdf', dpi=200)
 plt.show()

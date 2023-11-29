@@ -51,10 +51,10 @@ plt.plot(x, unl_hess_r, linestyle='-.', color='k',  marker='D', fillstyle='none'
 #plt.plot(x, without_replacement, color='palegreen',  marker='1',  label='RFU-SS',linewidth=l_w, markersize=m_s)
 
 plt.plot(x, unl_ss_w, linestyle='-', color='b', marker='o', fillstyle='none', markevery=markevery,
-         label='SMU$_{w}$', linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
+         label='PriMU$_{w}$', linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
 plt.plot(x, unl_ss_wo, linestyle='--', color='g',  marker='s', fillstyle='none', markevery=markevery,
-         label='SMU$_{w/o}$',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
+         label='PriMU$_{w/o}$',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
 
 
@@ -87,5 +87,5 @@ plt.rcParams['figure.subplot.left'] = 0.11
 plt.rcParams['figure.subplot.bottom'] = 0.08
 plt.rcParams['figure.subplot.right'] = 0.977
 plt.rcParams['figure.subplot.top'] = 0.969
-plt.savefig('infer_acc_sr_on_adult.png', dpi=200)
+plt.savefig('infer_acc_sr_on_adult.pdf', format='pdf', dpi=200)
 plt.show()

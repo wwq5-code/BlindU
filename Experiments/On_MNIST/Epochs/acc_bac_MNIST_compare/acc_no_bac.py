@@ -65,11 +65,11 @@ for i in range(150):
     y_hbu_b_acc_list.append(y_hfu_back_acc[i*t_i]*100)
 
 
-plt.figure()
+plt.figure(figsize=(7.,5))
 lw=3
-plt.plot(x, y_vibu_ss_acc_list, color='g', linestyle='-',  label='SMU',linewidth=lw, markersize=10)
+plt.plot(x, y_vibu_ss_acc_list, color='g', linestyle='-',  label='PriMU',linewidth=lw, markersize=10)
 # #plt.plot(x, y_fkl, color='g',  marker='+',  label='VRFL')
-plt.plot(x, y_vibu_ss_b_acc_list, color='orange', linestyle=(0,(3,1,1,1)),  label='SMU (Er.)',linewidth=lw, markersize=10)
+plt.plot(x, y_vibu_ss_b_acc_list, color='orange', linestyle=(0,(3,1,1,1)),  label='PriMU (Er.)',linewidth=lw, markersize=10)
 # #plt.plot(x, y_fkl, color='g',  marker='+',  label='VRFL')
 
 plt.plot(x, y_vbu_acc_list, color='tan', linestyle='--',   label='VBU',linewidth=lw,  markersize=10)
@@ -105,9 +105,9 @@ plt.yticks(my_y_ticks,fontsize=20)
 my_x_ticks = np.arange(0, 601, 100)
 plt.xticks(my_x_ticks,fontsize=20)
 # plt.title('CIFAR10 IID')
-# plt.legend(loc='best',fontsize=16)
-plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
-           ncol=3, mode="expand", borderaxespad=0., fontsize=14)
+plt.legend(loc='best',fontsize=16)
+# plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
+#            ncol=3, mode="expand", borderaxespad=0., fontsize=14)
 
 plt.tight_layout()
 #plt.title("Fashion MNIST")
@@ -117,5 +117,5 @@ plt.rcParams['figure.subplot.left'] = 0.11
 plt.rcParams['figure.subplot.bottom'] = 0.08
 plt.rcParams['figure.subplot.right'] = 0.977
 plt.rcParams['figure.subplot.top'] = 0.969
-plt.savefig('mnist_epoch_no_back_acc_temp.png', dpi=200)
+plt.savefig('mnist_epoch_no_back_acc_temp.pdf', format='pdf', dpi=200)
 plt.show()

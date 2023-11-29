@@ -32,11 +32,11 @@ markevery=1
 #plt.figure(figsize=(8, 5.3))
 #plt.plot(x, unl_fr, color='blue', marker='^', label='Retrain',linewidth=l_w, markersize=m_s)
 plt.plot(x, unl_ss_w, linestyle='-', color='b', marker='o', fillstyle='none', markevery=markevery,
-         label='SMU$_{w}$', linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
+         label='PriMU$_{w}$', linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
-#plt.plot(x, unl_ss_w, color='g',  marker='*',  label='SMU$_{w}$',linewidth=l_w, markersize=m_s)
+#plt.plot(x, unl_ss_w, color='g',  marker='*',  label='PriMU$_{w}$',linewidth=l_w, markersize=m_s)
 plt.plot(x, unl_ss_wo, linestyle='--', color='g',  marker='s', fillstyle='none', markevery=markevery,
-         label='SMU$_{w/o}$',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
+         label='PriMU$_{w/o}$',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
 plt.plot(x, unl_vbu, linestyle=':', color='r',  marker='^', fillstyle='none', markevery=markevery,
          label='VBU', linewidth=l_w,  markersize=m_s, markeredgewidth=marker_s)
@@ -67,7 +67,7 @@ plt.yticks(my_y_ticks,fontsize=20)
 plt.xlabel('$\it{EDR}$' ,fontsize=20)
 plt.xticks(x, labels, fontsize=20)
 # plt.title('CIFAR10 IID')
-plt.title('(b) Unlearning Effectiveness', fontsize=24)
+plt.title('(h) Unlearning Effectiveness', fontsize=24)
 plt.legend(loc='best',fontsize=20)
 plt.tight_layout()
 #plt.title("MNIST")
@@ -77,5 +77,5 @@ plt.rcParams['figure.subplot.left'] = 0.11
 plt.rcParams['figure.subplot.bottom'] = 0.08
 plt.rcParams['figure.subplot.right'] = 0.977
 plt.rcParams['figure.subplot.top'] = 0.969
-plt.savefig('cifar100_backacc_er_curve.png', dpi=200)
+plt.savefig('cifar100_backacc_er_curve.pdf', format='pdf', dpi=200)
 plt.show()

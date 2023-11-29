@@ -66,9 +66,9 @@ markevery=1
 # ax.scatter(x_coords, unl_org_0, marker='p', color='blue', zorder=20)
 ax.scatter(x_coords, unl_ss_w, marker='.', color='orange', zorder=2)
 # ax.plot(x_coords, unl_ss_w, color='blue', zorder=3)
-ax.plot(x_coords, unl_ss_w, color='dodgerblue',  marker='^', fillstyle='none',linestyle=(0,(2,1,1,1)), label='SMU$_{w}$',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
+ax.plot(x_coords, unl_ss_w, color='dodgerblue',  marker='^', fillstyle='none',linestyle=(0,(2,1,1,1)), label='PriMU$_{w}$',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
-ax.plot(x_coords, unl_ss_wo, color='limegreen',  marker='D', fillstyle='none', linestyle='--', label='SMU$_{w/o}$',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
+ax.plot(x_coords, unl_ss_wo, color='limegreen',  marker='D', fillstyle='none', linestyle='--', label='PriMU$_{w/o}$',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
 
 ax.plot(x_coords, unl_hess_r, color='orange',  marker='o',fillstyle='none', linestyle='-.', label='Grad. (HBFU)',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
@@ -124,7 +124,7 @@ plt.rcParams['figure.subplot.left'] = 0.11
 plt.rcParams['figure.subplot.bottom'] = 0.08
 plt.rcParams['figure.subplot.right'] = 0.977
 plt.rcParams['figure.subplot.top'] = 0.969
-plt.savefig('mnist_beta_recontruction.png', dpi=200)
+plt.savefig('mnist_beta_recontruction.pdf', format='pdf', dpi=200)
 plt.show()
 
 

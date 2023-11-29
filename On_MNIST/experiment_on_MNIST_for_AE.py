@@ -2973,23 +2973,23 @@ print("Running time (s) of VBU:", train_bs_nipsu*avg_of_one_batch)
 
 
 
-# print the results about SMU_w
+# print the results about PriMU_w
 print()
-print("print the results about SMU_w")
-print("Mutual information of SMU_w:", mi_of_w )
-print("Privacy leak attacks of SMU_w:", mse_w_final_vib)
-print("Backdoor Acc. of SMU_w:", backdoor_acc_mcfu_w)
-print("Acc. on test dataset of SMU_w:", valid_acc_mcfu_w)
-print("Running time (s) of SMU_w:", train_bs_mcfu_w*avg_of_one_batch*2) # as has the auxiliary dataset
+print("print the results about PriMU_w")
+print("Mutual information of PriMU_w:", mi_of_w )
+print("Privacy leak attacks of PriMU_w:", mse_w_final_vib)
+print("Backdoor Acc. of PriMU_w:", backdoor_acc_mcfu_w)
+print("Acc. on test dataset of PriMU_w:", valid_acc_mcfu_w)
+print("Running time (s) of PriMU_w:", train_bs_mcfu_w*avg_of_one_batch*2) # as has the auxiliary dataset
 
-# print the results about SMU_w/o
+# print the results about PriMU_w/o
 print()
-print("print the results about SMU_w/o")
-print("Mutual information of SMU_w/o:", mi_of_wo)
-print("Privacy leak attacks of SMU_w/o:", mse_wo_final_vib)
-print("Backdoor Acc. of SMU_w/o:", backdoor_acc_mcfu_wo)
-print("Acc. on test dataset of SMU_w/o:", valid_acc_mcfu_wo)
-print("Running time (s) of SMU_w/o:", train_bs_mcfu_wo*avg_of_one_batch*2)
+print("print the results about PriMU_w/o")
+print("Mutual information of PriMU_w/o:", mi_of_wo)
+print("Privacy leak attacks of PriMU_w/o:", mse_wo_final_vib)
+print("Backdoor Acc. of PriMU_w/o:", backdoor_acc_mcfu_wo)
+print("Acc. on test dataset of PriMU_w/o:", valid_acc_mcfu_wo)
+print("Running time (s) of PriMU_w/o:", train_bs_mcfu_wo*avg_of_one_batch*2)
 
 
 
@@ -2998,7 +2998,7 @@ print("Running time (s) of SMU_w/o:", train_bs_mcfu_wo*avg_of_one_batch*2)
 
 On MNIST, EDR = 6%, \\beta = 0.001, SR = 60%
 
-| On MNIST             | Origin      | HBFU     |    VBU   |  SMU_w  | SMU_w/o |
+| On MNIST             | Origin      | HBFU     |    VBU   |  PriMU_w  | PriMU_w/o |
 | --------             | --------    | -------- | -------- | -------- | -------- |
 | Mutual information   | 10.59       | 76.05    | 199.53   | 14.65    | 31.33    |
 | Privacy leak attacks | 33.13 (MSE) | 22.78    | 0.00     | 42.91    | 31.22    |

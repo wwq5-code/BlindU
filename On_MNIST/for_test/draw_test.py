@@ -65,8 +65,8 @@ m_s=10
 # ax.scatter(x_coords, unl_org_0, marker='p', color='blue', zorder=20)
 ax.scatter(x_coords, unl_ss_wo, marker='.', color='orange', zorder=2)
 # ax.plot(x_coords, unl_ss_w, color='blue', zorder=3)
-ax.plot(x_coords, unl_ss_wo, color='orange',  marker='*', linestyle='-.', label='SMU',linewidth=l_w, markersize=m_s)
-#ax.plot(x_coords, unl_ss_wo, color='palegreen',  marker='1',  label='SMU$_{w/o}$',linewidth=l_w, markersize=m_s)
+ax.plot(x_coords, unl_ss_wo, color='orange',  marker='*', linestyle='-.', label='PriMU',linewidth=l_w, markersize=m_s)
+#ax.plot(x_coords, unl_ss_wo, color='palegreen',  marker='1',  label='PriMU$_{w/o}$',linewidth=l_w, markersize=m_s)
 
 ax.plot(x_coords, unl_org_0, color='b',  marker='p', linestyle='-', label='Orignal Fig.',linewidth=l_w, markersize=m_s)
 

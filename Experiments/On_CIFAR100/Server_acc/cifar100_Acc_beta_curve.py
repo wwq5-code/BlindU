@@ -18,8 +18,8 @@ unl_org = [51.85,    51.73,   52.24, 51.56, 47.81+3]
 unl_hess_r = [51.03, 51.03,   51.03, 51.03, 51.03]
 unl_vbu = [33.54,    33.54,   33.54, 33.54, 33.54]
 
-unl_ss_w = [48.15,   50.99,    52.79, 49.95, 47.43]
-unl_ss_wo = [47.95,  51.82,    52.06, 49.99, 48.63]
+unl_ss_w = [48.15,   50.99,    52.25, 49.95, 47.43]
+unl_ss_wo = [47.95,  51.82,    52.13, 49.99, 48.63]
 
 
 
@@ -31,11 +31,11 @@ markevery=1
 #plt.figure(figsize=(8, 5.3))
 #plt.plot(x, unl_fr, color='blue', marker='^', label='Retrain',linewidth=l_w, markersize=m_s)
 plt.plot(x, unl_ss_w, linestyle='-', color='b', marker='o', fillstyle='none', markevery=markevery,
-         label='SMU$_{w}$', linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
+         label='PriMU$_{w}$', linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
-#plt.plot(x, unl_ss_w, color='g',  marker='*',  label='SMU$_{w}$',linewidth=l_w, markersize=m_s)
+#plt.plot(x, unl_ss_w, color='g',  marker='*',  label='PriMU$_{w}$',linewidth=l_w, markersize=m_s)
 plt.plot(x, unl_ss_wo, linestyle='--', color='g',  marker='s', fillstyle='none', markevery=markevery,
-         label='SMU$_{w/o}$',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
+         label='PriMU$_{w/o}$',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
 plt.plot(x, unl_vbu, linestyle=':', color='r',  marker='^', fillstyle='none', markevery=markevery,
          label='VBU', linewidth=l_w,  markersize=m_s, markeredgewidth=marker_s)
@@ -62,7 +62,7 @@ plt.xlabel('$\\beta$', fontsize=20)
 plt.xticks(x, labels, fontsize=20)
 # plt.title('CIFAR10 IID')
 
-plt.title('(c) Utility Preservation', fontsize=24)
+plt.title('(i) Utility Preservation', fontsize=24)
 plt.legend(loc='best',fontsize=20)
 plt.tight_layout()
 #plt.title("MNIST")
@@ -72,5 +72,5 @@ plt.rcParams['figure.subplot.left'] = 0.11
 plt.rcParams['figure.subplot.bottom'] = 0.08
 plt.rcParams['figure.subplot.right'] = 0.977
 plt.rcParams['figure.subplot.top'] = 0.969
-plt.savefig('cifar100_acc_beta_curve.png', dpi=200)
+plt.savefig('cifar100_acc_beta_curve.pdf', format='pdf', dpi=200)
 plt.show()
