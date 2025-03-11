@@ -596,7 +596,7 @@ class PoisonedDataset(Dataset):
                 # x_cpu = x.cpu().data
                 # x_cpu = x_cpu.clamp(0, 1)
                 # x_cpu = x_cpu.view(1, 1, 28, 28)
-                # grid = torchvision.utils.make_grid(x_cpu, nrow=1, cmap="gray")
+                # grid = torchvision.utils.make_grid(x_cpu, nrow=1 )
                 # plt.imshow(np.transpose(grid, (1, 2, 0)))  # 交换维度，从GBR换成RGB
                 # plt.show()
 
@@ -639,7 +639,7 @@ def show_cifar(x):
     elif args.dataset == "CIFAR10":
         x = x.view(x.size(0), 3, 32, 32)
     # print(x)
-    grid = torchvision.utils.make_grid(x, nrow=4, cmap="gray")
+    grid = torchvision.utils.make_grid(x, nrow=4 )
     plt.imshow(np.transpose(grid, (1, 2, 0)))  # 交换维度，从GBR换成RGB
     plt.show()
 
@@ -657,7 +657,7 @@ def create_backdoor_train_dataset(dataname, train_data, base_label, trigger_labe
     elif args.dataset == "CIFAR10":
         x = x.view(1, 3, 32, 32)
     print(x)
-    grid = torchvision.utils.make_grid(x, nrow=1, cmap="gray")
+    grid = torchvision.utils.make_grid(x, nrow=1 )
     plt.imshow(np.transpose(grid, (1, 2, 0)))  # 交换维度，从GBR换成RGB
     plt.show()
     return train_data.data, train_data.targets
@@ -668,7 +668,7 @@ def create_backdoor_train_dataset(dataname, train_data, base_label, trigger_labe
                 # x_cpu = x.cpu().data
                 # x_cpu = x_cpu.clamp(0, 1)
                 # x_cpu = x_cpu.view(1, 3, 32, 32)
-                # grid = torchvision.utils.make_grid(x_cpu, nrow=1, cmap="gray")
+                # grid = torchvision.utils.make_grid(x_cpu, nrow=1 )
                 # plt.imshow(np.transpose(grid, (1, 2, 0)))  # 交换维度，从GBR换成RGB
                 # plt.show()
 """
@@ -687,7 +687,7 @@ def create_backdoor_test_dataset(dataname, test_data, base_label, trigger_label,
         x = x.view(x.size(0), 1, 28, 28)
     elif args.dataset == "CIFAR10":
         x = x.view(1, 3, 32, 32)
-    grid = torchvision.utils.make_grid(x, nrow=1, cmap="gray")
+    grid = torchvision.utils.make_grid(x, nrow=1 )
     plt.imshow(np.transpose(grid, (1, 2, 0)))  # 交换维度，从GBR换成RGB
     plt.show()
     return b
@@ -851,7 +851,7 @@ class Mine2(nn.Module):
         x_sample = self.fc1_sample(sample)
         x = F.leaky_relu(x_noise + x_sample + self.fc1_bias, negative_slope=2e-1)
         x = F.leaky_relu(self.fc2(x), negative_slope=2e-1)
-        x = F.leaky_relu(self.fc3(x), negative_slope=2e-1)
+        x = F.softplus(self.fc3(x)) #, negative_slope=2e-1
         return x
 
 
@@ -1270,6 +1270,8 @@ def unlearning_frkl_compressed(vibi_f_frkl, optimizer_frkl, vibi, epoch_test_acc
     train_bs = 0
     temp_acc = []
     temp_back = []
+    mi_list = []
+    loss_list = []
     for epoch in range(args.num_epochs):
         vibi_f_frkl.train()
         step_start = epoch * len(dataloader_erase)
@@ -1490,7 +1492,7 @@ def unlearning_frkl_compressed(vibi_f_frkl, optimizer_frkl, vibi, epoch_test_acc
                 'KLD_mean_e2':KLD_mean2.item(),
                 'mutual_info':mi,
             }
-
+            mi_list.append(mi)
             for m, v in metrics.items():
                 logs[m].append(v)
             # if epoch == args.num_epochs - 1:
@@ -1501,7 +1503,7 @@ def unlearning_frkl_compressed(vibi_f_frkl, optimizer_frkl, vibi, epoch_test_acc
                       + ', '.join([f'{k} {v:.3f}' for k, v in metrics.items()]))
             index = index + 1
             train_bs = train_bs+1
-            if acc_back < 0.05:
+            if acc_back < 0.05 and train_type == 'NIPSU':
                 break
 
         vibi_f_frkl.eval()
@@ -1528,7 +1530,7 @@ def unlearning_frkl_compressed(vibi_f_frkl, optimizer_frkl, vibi, epoch_test_acc
     print("end unlearn, train_bs", train_bs)
     print("temp_acc", temp_acc)
     print("temp_back", temp_back)
-
+    print("mi_list", mi_list)
     return vibi_f_frkl, optimizer_frkl, epoch_test_acc
 
 
@@ -1979,27 +1981,25 @@ def learn_mine(G, M, M_opt,args , ma_rate=0.001):
     return mutual_information.item()
 
 
-def calculate_MI(X, Z, Z_size, M, M_opt, args, ma_rate=0.001):
+def calculate_MI(X, Z, Z_size, Model, M_opt, args, ma_rate=0.001):
     '''
     we use Mine to calculate the mutual information between two layers of networks.
-    :param G:
-    :param M:
-    :param ma_rate:
-    :return:
     '''
 
     z_bar = torch.randn((args.local_bs, Z_size)).to(args.device)
 
-    et = torch.mean(torch.exp(M(z_bar, X)))
+    et = torch.mean(torch.exp(Model(z_bar, X)))
 
-    if M.ma_et is None:
-        M.ma_et = et.detach().item()
+    if Model.ma_et is None:
+        Model.ma_et = et.detach()
 
-    M.ma_et += ma_rate * (et.detach().item() - M.ma_et)
+    Model.ma_et = Model.ma_et * (1 - ma_rate) + et.detach() * ma_rate
 
     #z = torch.narrow(z, dim=1, start=0, length=3)  # slice for MI
-    mutual_information = torch.mean(M(Z, X)) \
-                         - torch.log(et) * et.detach() / M.ma_et
+    # mutual_information = torch.mean(Model(Z, X)) - torch.log(et) * et.detach() / Model.ma_et
+    # Correct mutual information calculation
+    epsilon = 1e-8
+    mutual_information = torch.mean(Model(Z, X)) - torch.log(et / (Model.ma_et + epsilon))
 
     loss = - mutual_information
 
@@ -2551,13 +2551,13 @@ def reconstruct_Attack(vibi, reconstructor, reconstruction_function, args, datal
     # x_hat_cpu = x_hat.cpu().data
     # x_hat_cpu = x_hat_cpu.clamp(0, 1)
     # x_hat_cpu = x_hat_cpu.view(x_hat_cpu.size(0), 1, 28, 28)
-    # grid = torchvision.utils.make_grid(x_hat_cpu, nrow=4, cmap="gray")
+    # grid = torchvision.utils.make_grid(x_hat_cpu, nrow=4 )
     # plt.imshow(np.transpose(grid, (1, 2, 0)))  # 交换维度，从GBR换成RGB
     # plt.show()
     # x_cpu = x.cpu().data
     # x_cpu = x_cpu.clamp(0, 1)
     # x_cpu = x_cpu.view(x_cpu.size(0), 1, 28, 28)
-    # grid = torchvision.utils.make_grid(x_cpu, nrow=4, cmap="gray")
+    # grid = torchvision.utils.make_grid(x_cpu, nrow=4 )
     # plt.imshow(np.transpose(grid, (1, 2, 0)))  # 交换维度，从GBR换成RGB
     # plt.show()
     # show_cifar(x_hat)

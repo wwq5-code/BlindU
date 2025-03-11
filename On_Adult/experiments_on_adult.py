@@ -1185,9 +1185,9 @@ args.dataset = 'Adult'
 args.add_noise = False
 args.beta = 0.001  # 0.001
 args.lr = 0.001
-args.max_norm=1
+args.max_norm = 1
 args.dimZ = 9 #9 #40 #2 9 , 12
-args.batch_size =20  # 1 for infer ,20 for normal training
+args.batch_size = 20  # 1 for infer ,20 for normal training
 args.erased_local_r = 0.06  # the erased data ratio
 args.back_acc_threshold = 0.1
 

@@ -25,7 +25,7 @@ def weights_init(m):
 class Generator(nn.Module):
     def __init__(self, nc=3, nz=100, ngf=64):
         super(Generator, self).__init__()
-        self.linear = nn.Linear(1402,50)
+        self.linear = nn.Linear(512,50)
         self.main = nn.Sequential(
             # input is Z, going into a convolution
             nn.ConvTranspose2d(     nz, ngf * 8, 4, 1, 0, bias=False),
@@ -91,7 +91,7 @@ class Discriminator(nn.Module):
         # firs half
         x1 = torch.cat((x, grad), dim=2)
         x2 = torch.cat((x, grad), dim=2)
-        x = torch.cat((x1,x2), dim=3)
+        x = torch.cat((x1, x2), dim=3)
         output = self.main(x)
         return output.view(-1, 1).squeeze(1)
 
@@ -103,7 +103,7 @@ def show_cifar(x):
 
     x = x.view(x.size(0), 3, 32, 32)
     # print(x)
-    grid = torchvision.utils.make_grid(x, nrow=4, cmap="gray")
+    grid = torchvision.utils.make_grid(x, nrow=4 )
     plt.imshow(np.transpose(grid, (1, 2, 0)))  # 交换维度，从GBR换成RGB
     plt.show()
 
@@ -124,11 +124,11 @@ loader=DataLoader(
 
 
 
-attacker = Generator().to(device)
-optimizer_G = torch.optim.Adam(attacker.parameters(), lr=lr, betas=betas)
+generator = Generator().to(device)
+optimizer_G = torch.optim.Adam(generator.parameters(), lr=lr, betas=betas)
 discriminator = Discriminator().to(device)
 optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=lr, betas=betas)
-attacker.apply(weights_init)
+generator.apply(weights_init)
 discriminator.apply(weights_init)
 
 
@@ -141,7 +141,7 @@ for epoch in range(epochs):
         fake = Variable(FloatTensor(batch_size).fill_(0.0), requires_grad=False).to(device)
         optimizer_D.zero_grad()
         z = torch.randn(batch_size, 50, device=device)
-        x_hat = attacker(z, grad)
+        x_hat = generator(z, grad)
         validity_real = discriminator(data_z, grad)
         d_real_loss = torch.nn.BCELoss()(validity_real, valid)
         d_real_loss.backward()
@@ -151,9 +151,9 @@ for epoch in range(epochs):
         d_loss = (d_real_loss + d_fake_loss) / 1
         optimizer_D.step()
 
-        #train attacker
+        #train generator
         optimizer_G.zero_grad()
-        #x_hat = attacker(grad)
+        #x_hat = generator(grad)
         grad_loss = 0
         validity = discriminator(x_hat, grad)
         mseloss = torch.nn.MSELoss()(x_hat, data_z)
@@ -166,36 +166,3 @@ for epoch in range(epochs):
         show_cifar(x_hat)
     
     
-def label_to_onehot(target, num_classes=10):
-    target = torch.unsqueeze(target, 1)
-    onehot_target = torch.zeros(target.size(0), num_classes, device=target.device)
-    onehot_target.scatter_(1, target, 1)
-    return onehot_target
-
-def cost(pred, target, device):
-    return torch.mean(torch.sum(- target * F.log_softmax(pred, dim=-1), 1)).to(device)
-
-class LeNet(torch.nn.Module):
-    def __init__(self, channel=1, hideen=588, num_classes=10):
-        super(LeNet, self).__init__()
-        act = torch.nn.ReLU
-        self.body = torch.nn.Sequential(
-            torch.nn.Conv2d(channel, 4, kernel_size=3),
-            act(),
-            torch.nn.MaxPool2d(2),
-            torch.nn.Conv2d(4, 8, kernel_size=3),
-            act(),
-            torch.nn.MaxPool2d(2),
-            torch.nn.Conv2d(8, 32, kernel_size=3),
-            act(),
-            torch.nn.MaxPool2d(2),
-        )
-        self.fc = torch.nn.Sequential(
-            torch.nn.Linear(hideen, num_classes)
-        )
-
-    def forward(self, x):
-        out = self.body(x)
-        out = out.view(out.size(0), -1)
-        out = self.fc(out)
-        return out  

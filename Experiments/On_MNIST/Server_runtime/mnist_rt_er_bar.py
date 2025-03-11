@@ -49,8 +49,9 @@ plt.xlabel('$\it{EDR}$' ,fontsize=20)
 # ax.bar_label(rects1, padding=1)
 # ax.bar_label(rects2, padding=3)
 # ax.bar_label(rects3, padding=3)
-
+plt.title("(a) On MNIST",fontsize=24)
 plt.tight_layout()
+
 
 plt.rcParams['figure.figsize'] = (2.0, 1)
 plt.rcParams['image.interpolation'] = 'nearest'

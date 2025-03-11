@@ -40,13 +40,13 @@ index_change = 0.4
 
 #load org
 image = mpimg.imread('mnist_image_sr_0001_org_wo.png')
-ax.imshow(image, extent=[x_coords[0]+0.05, x_coords[0]+2*index_change/5*4+0.05, unl_org_0[0]+1.2, unl_org_0[0]+2*index_change/5*100+1.2], aspect='auto')
+ax.imshow(image, extent=[x_coords[0]+0.05, x_coords[0]+2*index_change/5*4+0.05, unl_org_0[0]+1.2, unl_org_0[0]+2*index_change/4*100+1.2], aspect='auto')
 image = mpimg.imread('mnist_image_sr_001_org_wo.png')
-ax.imshow(image, extent=[x_coords[1] +0.05, x_coords[1]+2*index_change/5*4+0.05, unl_org_0[1]+1.2, unl_org_0[1]+2*index_change/5*100+1.2], aspect='auto')
+ax.imshow(image, extent=[x_coords[1] +0.05, x_coords[1]+2*index_change/5*4+0.05, unl_org_0[1]+1.2, unl_org_0[1]+2*index_change/4*100+1.2], aspect='auto')
 image = mpimg.imread('mnist_image_sr_01_org_wo.png')
-ax.imshow(image, extent=[x_coords[2] +0.05, x_coords[2]+2*index_change/5*4+0.05, unl_org_0[2]+1.2, unl_org_0[2]+2*index_change/5*100+1.2], aspect='auto')
+ax.imshow(image, extent=[x_coords[2] +0.05, x_coords[2]+2*index_change/5*4+0.05, unl_org_0[2]+1.2, unl_org_0[2]+2*index_change/4*100+1.2], aspect='auto')
 image = mpimg.imread('mnist_image_sr_1_org_wo.png')
-ax.imshow(image, extent=[x_coords[3] +0.05, x_coords[3]+2*index_change/5*4+0.05, unl_org_0[3]+1.2, unl_org_0[3]+2*index_change/5*100+1.2], aspect='auto')
+ax.imshow(image, extent=[x_coords[3] +0.05, x_coords[3]+2*index_change/5*4+0.05, unl_org_0[3]+1.2, unl_org_0[3]+2*index_change/4*100+1.2], aspect='auto')
 image = mpimg.imread('mnist_image_sr_10_org_wo.png')
 #ax.imshow(image, extent=[x_coords[4] +0.05, x_coords[4]+2*index_change/5*4+0.05, unl_org_0[4], unl_org_0[4]+2*index_change/4*60], aspect='auto')
 
@@ -54,13 +54,13 @@ image = mpimg.imread('mnist_image_sr_10_org_wo.png')
 #image = mpimg.imread('mnist_image_beta_0001_wo.png')
 #ax.imshow(image, extent=[x_coords[0]-index_change/5*4, x_coords[0]+index_change/5*4, unl_ss_wo[0], unl_ss_wo[0]+2*index_change/4*60], aspect='auto')
 image = mpimg.imread('mnist_image_sr_001_wo.png')
-ax.imshow(image, extent=[x_coords[1]-2*index_change/5*4 -0.05, x_coords[1] -0.05, unl_ss_w[1], unl_ss_w[1]+2*index_change/5*100], aspect='auto')
+ax.imshow(image, extent=[x_coords[1]-2*index_change/5*4 -0.05, x_coords[1] -0.05, unl_ss_w[1], unl_ss_w[1]+2*index_change/4*100], aspect='auto')
 image = mpimg.imread('mnist_image_sr_01_wo.png')
-ax.imshow(image, extent=[x_coords[2]-2*index_change/5*4 -0.05, x_coords[2]-0.05 , unl_ss_w[2], unl_ss_w[2]+2*index_change/5*100], aspect='auto')
+ax.imshow(image, extent=[x_coords[2]-2*index_change/5*4 -0.05, x_coords[2]-0.05 , unl_ss_w[2], unl_ss_w[2]+2*index_change/4*100], aspect='auto')
 image = mpimg.imread('mnist_image_sr_1_wo.png')
-ax.imshow(image, extent=[x_coords[3]-2*index_change/5*4-0.05, x_coords[3] -0.05, unl_ss_w[3], unl_ss_w[3]+2*index_change/5*100], aspect='auto')
+ax.imshow(image, extent=[x_coords[3]-2*index_change/5*4-0.05, x_coords[3] -0.05, unl_ss_w[3], unl_ss_w[3]+2*index_change/4*100], aspect='auto')
 image = mpimg.imread('mnist_image_sr_10_wo.png')
-ax.imshow(image, extent=[x_coords[4]-2*index_change/5*4-0.05, x_coords[4]-0.05 , unl_ss_w[4], unl_ss_w[4]+2*index_change/5*100], aspect='auto')
+ax.imshow(image, extent=[x_coords[4]-2*index_change/5*4-0.05, x_coords[4]-0.05 , unl_ss_w[4], unl_ss_w[4]+2*index_change/4*100], aspect='auto')
 
 
 l_w=5
@@ -84,13 +84,13 @@ ax.plot(x_coords, unl_org_0, color='orangered',  marker='p',  fillstyle='none', 
 
 
 
-y_coords = [-10,10,20,30,90]
+y_coords = [-10,10,20,30,111]
 x1=[2,2,2,2,2]
 ax.plot(x1, y_coords, color='gray',   linestyle='-',linewidth=1, markersize=m_s)
-y_coords = [-10,10,20,30,90]
+y_coords = [-10,10,20,30,111]
 x1=[3,3,3,3,3]
 ax.plot(x1, y_coords, color='gray',   linestyle='-',linewidth=1, markersize=m_s)
-y_coords = [-10,10,20,30,90]
+y_coords = [-10,10,20,30,111]
 x1=[4,4,4,4,4]
 ax.plot(x1, y_coords, color='gray',   linestyle='-',linewidth=1, markersize=m_s)
 
@@ -107,7 +107,7 @@ plt.autoscale(False)
 leg = plt.legend(fancybox=True, shadow=True)
 # plt.xlabel('Malicious Client Ratio (%)' ,fontsize=16)
 plt.ylabel('Average MSE' ,fontsize=20)
-my_y_ticks = np.arange(0 ,81,20)
+my_y_ticks = np.arange(0, 102, 20)
 plt.yticks(my_y_ticks,fontsize=20)
 ymin, ymax = plt.ylim()
 plt.ylim(ymin - 0.05*(ymax-ymin), ymax + 0.05*(ymax-ymin))
@@ -119,7 +119,7 @@ xmin, xmax = plt.xlim()
 plt.xlim(xmin - 0.05*(xmax-xmin), xmax + 0.05*(xmax-xmin))
 
 # plt.title('CIFAR10 IID') center right
-plt.legend(loc='best',fontsize=20)
+plt.legend(loc=(0.401, 0.555),fontsize=20) #(0.5, 0.5)
 plt.tight_layout()
 #plt.title("MNIST")
 plt.rcParams['figure.figsize'] = (2.0, 1)

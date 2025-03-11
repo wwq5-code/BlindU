@@ -25,6 +25,8 @@ from torch.utils.data import DataLoader, Dataset
 import copy
 import random
 import time
+from torch.nn.functional import cosine_similarity
+
 
 
 def conv_block(in_channels, out_channels, stride=1):
@@ -618,7 +620,7 @@ def args_parser():
     parser.add_argument('--local_bs', type=int, default=20, help='Size of local batch')
     parser.add_argument('--num_epochs', type=int, default=20, help='Set the training epochs')
     parser.add_argument('--cuda', action='store_true')
-    parser.add_argument('--beta', type=float, default=0.001, help='beta in objective J = I(y,z) - beta * I(x,z).')
+    parser.add_argument('--beta', type=float, default=0.0001, help='beta in objective J = I(y,z) - beta * I(x,z).')
     parser.add_argument('--lr', type=float, default=0.001, help='set the learning rate')
     parser.add_argument('--max_norm', type=int, default=1, help='set max_norm used in clip_grad_norm_ ')
     parser.add_argument('--erased_portion', type=float, default=0.3, help='set the erased user rate of the total users')
@@ -662,7 +664,7 @@ def show_cifar(x):
     elif args.dataset == "CIFAR10":
         x = x.view(1, 3, 32, 32)
 
-    grid = torchvision.utils.make_grid(x, nrow=1, cmap="gray")
+    grid = torchvision.utils.make_grid(x, nrow=1)
     plt.imshow(np.transpose(grid, (1, 2, 0)))  # 交换维度，从GBR换成RGB
     plt.show()
 
@@ -680,7 +682,7 @@ def create_backdoor_train_dataset(dataname, train_data, base_label, trigger_labe
     elif args.dataset == "CIFAR10":
         x = x.view(1, 3, 32, 32)
 
-    grid = torchvision.utils.make_grid(x, nrow=1, cmap="gray")
+    grid = torchvision.utils.make_grid(x, nrow=1 )
     plt.imshow(np.transpose(grid, (1, 2, 0)))  # 交换维度，从GBR换成RGB
     plt.show()
     return train_data.data, train_data.targets
@@ -710,7 +712,7 @@ def create_backdoor_test_dataset(dataname, test_data, base_label, trigger_label,
         x = x.view(x.size(0), 1, 28, 28)
     elif args.dataset == "CIFAR10":
         x = x.view(1, 3, 32, 32)
-    grid = torchvision.utils.make_grid(x, nrow=1, cmap="gray")
+    grid = torchvision.utils.make_grid(x, nrow=1 )
     plt.imshow(np.transpose(grid, (1, 2, 0)))  # 交换维度，从GBR换成RGB
     plt.show()
     return b
@@ -2385,13 +2387,13 @@ def prepare_learning_model(dataloader_full, train_loader, test_loader, dataloade
         x_hat_cpu = x_hat.cpu().data
         x_hat_cpu = x_hat_cpu.clamp(0, 1)
         x_hat_cpu = x_hat_cpu.view(x_hat_cpu.size(0), 1, 28, 28)
-        grid = torchvision.utils.make_grid(x_hat_cpu, nrow=4, cmap="gray")
+        grid = torchvision.utils.make_grid(x_hat_cpu, nrow=4 )
         plt.imshow(np.transpose(grid, (1, 2, 0)))  # 交换维度，从GBR换成RGB
         plt.show()
         x_cpu = x.cpu().data
         x_cpu = x_cpu.clamp(0, 1)
         x_cpu = x_cpu.view(x_cpu.size(0), 1, 28, 28)
-        grid = torchvision.utils.make_grid(x_cpu, nrow=4, cmap="gray")
+        grid = torchvision.utils.make_grid(x_cpu, nrow=4 )
         plt.imshow(np.transpose(grid, (1, 2, 0)))  # 交换维度，从GBR换成RGB
         plt.show()
 
@@ -2403,6 +2405,7 @@ def prepare_reconstruction_attack(vibi, reconstructor, reconstruction_function, 
     optimizer = torch.optim.Adam(vibi.parameters(), lr=args.lr)
     optimizer_recon = torch.optim.Adam(reconstructor.parameters(), lr=args.lr)
     final_round_mse = []
+    similarity_term = []
     for epoch in range(init_epoch, init_epoch + args.num_epochs):
         vibi.train()
         step_start = epoch * len(dataloader_erase_single)
@@ -2448,12 +2451,17 @@ def prepare_reconstruction_attack(vibi, reconstructor, reconstruction_function, 
             torch.nn.utils.clip_grad_norm_(vibi.parameters(), 5, norm_type=2.0, error_if_nonfinite=False)
             optimizer_recon.step()
 
+
             if epoch == args.num_epochs - 1:
                 final_round_mse.append(BCE.item())
+                cos_sim = cosine_similarity(x_hat.view(1, -1), x.view(1, -1))
+                similarity_term.append(cos_sim.item())
             if step % len(train_loader) % 600 == 0:
                 print('epoch: ',epoch,"loss", loss.item(), 'BCE', BCE.item())
 
     print("final_round mse", np.mean(final_round_mse))
+    print("cosine similarity:", sum(similarity_term) / len(similarity_term))
+
     final_round_mse = np.mean(final_round_mse) # this is for signle sample, therefore, we do not need to divide the local_bs to get the average
     for step, (x, y) in enumerate(test_loader, start=step_start):
         x, y = x.to(args.device), y.to(args.device)  # (B, C, H, W), (B, 10)
@@ -2473,13 +2481,13 @@ def prepare_reconstruction_attack(vibi, reconstructor, reconstruction_function, 
     x_hat_cpu = x_hat.cpu().data
     x_hat_cpu = x_hat_cpu.clamp(0, 1)
     x_hat_cpu = x_hat_cpu.view(x_hat_cpu.size(0), 1, 28, 28)
-    grid = torchvision.utils.make_grid(x_hat_cpu, nrow=4, cmap="gray")
+    grid = torchvision.utils.make_grid(x_hat_cpu, nrow=4 )
     plt.imshow(np.transpose(grid, (1, 2, 0)))  # 交换维度，从GBR换成RGB
     plt.show()
     x_cpu = x.cpu().data
     x_cpu = x_cpu.clamp(0, 1)
     x_cpu = x_cpu.view(x_cpu.size(0), 1, 28, 28)
-    grid = torchvision.utils.make_grid(x_cpu, nrow=4, cmap="gray")
+    grid = torchvision.utils.make_grid(x_cpu, nrow=4 )
     plt.imshow(np.transpose(grid, (1, 2, 0)))  # 交换维度，从GBR换成RGB
     plt.show()
     return reconstructor, final_round_mse
@@ -2696,6 +2704,7 @@ poison_data, poison_targets = create_backdoor_train_dataset(dataname=args.datase
                                                             base_label=base_label,
                                                             trigger_label=trigger_label, poison_samples=poison_samples,
                                                             batch_size=args.local_bs, args=args, add_backdoor=add_backdoor, dp_sample=0)
+
 
 # these two is sampled for unlearning
 sampled_data, sample_labels = create_backdoor_train_dataset(dataname=args.dataset, train_data=train_set,

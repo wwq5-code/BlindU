@@ -22,7 +22,7 @@ width = 0.6  # the width of the bars
 # ldp = np.around(ldp,0)
 
 
-plt.figure()
+plt.figure() #figsize=(6, 5)
 #plt.subplots(figsize=(8, 5.3))
 #plt.bar(x - width / 2 - width / 8 + width / 8, unl_fr, width=0.168, label='Retrain', color='dodgerblue', hatch='/')
 plt.bar(x - width / 2 - width / 8 + width / 8 , unl_br,   width=0.168, label='VBU', color='r', hatch='/')
@@ -51,6 +51,7 @@ plt.xlabel('$\\beta$' ,fontsize=20)
 # ax.bar_label(rects1, padding=1)
 # ax.bar_label(rects2, padding=3)
 # ax.bar_label(rects3, padding=3)
+plt.title("(a) On MNIST", fontsize=24)
 
 plt.tight_layout()
 

@@ -81,13 +81,13 @@ ax.plot(x_coords, unl_hess_r, color='orange',  marker='o',  fillstyle='none', li
 ax.plot(x_coords, unl_org_0, color='orangered',  marker='p',  fillstyle='none', label='Masked Image',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
 
-y_coords = [-10,10,20,30,666]
+y_coords = [-30,10,20,30,666]
 x1=[2,2,2,2,2]
 ax.plot(x1, y_coords, color='gray',   linestyle='-',linewidth=1, markersize=m_s)
-y_coords = [-10,10,20,30,666]
+y_coords = [-30,10,20,30,666]
 x1=[3,3,3,3,3]
 ax.plot(x1, y_coords, color='gray',   linestyle='-',linewidth=1, markersize=m_s)
-y_coords = [-10,10,20,30,666]
+y_coords = [-30,10,20,30,666]
 x1=[4,4,4,4,4]
 ax.plot(x1, y_coords, color='gray',   linestyle='-',linewidth=1, markersize=m_s)
 
@@ -101,7 +101,7 @@ ax.plot(x1, y_coords, color='gray',   linestyle='-',linewidth=1, markersize=m_s)
 # plt.title('CIFAR-10 image at specified points')
 # 关闭自动扩展功能
 plt.autoscale(False)
-leg = plt.legend(fancybox=True, shadow=True)
+#leg = plt.legend(fancybox=True, shadow=True)
 # plt.xlabel('Malicious Client Ratio (%)' ,fontsize=16)
 plt.ylabel('Average MSE' ,fontsize=20)
 my_y_ticks = np.arange(0 ,560,100)
@@ -116,7 +116,8 @@ xmin, xmax = plt.xlim()
 plt.xlim(xmin - 0.05*(xmax-xmin), xmax + 0.05*(xmax-xmin))
 
 # plt.title('CIFAR10 IID') center right
-plt.legend(loc='best',fontsize=20)
+
+#plt.legend(loc='best',fontsize=20)
 plt.tight_layout()
 #plt.title("MNIST")
 plt.rcParams['figure.figsize'] = (2.0, 1)

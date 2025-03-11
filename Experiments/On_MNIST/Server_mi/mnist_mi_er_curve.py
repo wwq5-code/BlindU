@@ -21,7 +21,7 @@ unl_hess_r = [78.16, 64.299, 76.05, 69.436, 69.45]
 unl_vbu = [164.16, 146.299, 199.28, 167.86, 129.61]
 
 unl_ss_w = [17.6, 18.12, 14.657, 18.06, 20.63]
-unl_ss_wo = [23.54, 19.375, 31.33, 33.92, 37.80]
+unl_ss_wo = [23.54, 19.375, 31.33, 23.92, 27.80]
 
 
 
@@ -39,11 +39,11 @@ plt.plot(x, unl_ss_w, linestyle='-', color='b', marker='o', fillstyle='none', ma
 plt.plot(x, unl_ss_wo, linestyle='--', color='g',  marker='s', fillstyle='none', markevery=markevery,
          label='PriMU$_{w/o}$',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
-plt.plot(x, unl_vbu, linestyle=':', color='r',  marker='^', fillstyle='none', markevery=markevery,
-         label='VBU', linewidth=l_w,  markersize=m_s, markeredgewidth=marker_s)
-
-plt.plot(x, unl_hess_r, linestyle='-.', color='k',  marker='D', fillstyle='none', markevery=markevery,
-         label='HBFU',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
+# plt.plot(x, unl_vbu, linestyle=':', color='r',  marker='^', fillstyle='none', markevery=markevery,
+#          label='VBU', linewidth=l_w,  markersize=m_s, markeredgewidth=marker_s)
+#
+# plt.plot(x, unl_hess_r, linestyle='-.', color='k',  marker='D', fillstyle='none', markevery=markevery,
+#          label='HBFU',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
 
 #plt.plot(x, unl_vibu, color='silver',  marker='d',  label='VIBU',linewidth=4,  markersize=10)
@@ -57,13 +57,13 @@ plt.plot(x, unl_hess_r, linestyle='-.', color='k',  marker='D', fillstyle='none'
 plt.grid()
 leg = plt.legend(fancybox=True, shadow=True)
 # plt.xlabel('Malicious Client Ratio (%)' ,fontsize=16)
-plt.ylabel('Mutual Information' ,fontsize=24)
-my_y_ticks = np.arange(0 ,201,40)
+plt.ylabel('MI of $I(Z_e;X_e)$' ,fontsize=24)
+my_y_ticks = np.arange(0 ,101,20)
 plt.yticks(my_y_ticks,fontsize=20)
 plt.xlabel('$\it{EDR}$' ,fontsize=20)
 
 plt.xticks(x, labels, fontsize=20)
-plt.title('(a) Privacy Preservation', fontsize=24)
+plt.title('(a) Information in $Z_e$', fontsize=24)
 # plt.title('CIFAR10 IID')
 plt.legend(loc='best',fontsize=20)
 plt.tight_layout()

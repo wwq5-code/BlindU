@@ -37,11 +37,11 @@ plt.plot(x, unl_ss_w, linestyle='-', color='b', marker='o', fillstyle='none', ma
 plt.plot(x, unl_ss_wo, linestyle='--', color='g',  marker='s', fillstyle='none', markevery=markevery,
          label='PriMU$_{w/o}$',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
-plt.plot(x, unl_vbu, linestyle=':', color='r',  marker='^', fillstyle='none', markevery=markevery,
-         label='VBU', linewidth=l_w,  markersize=m_s, markeredgewidth=marker_s)
-
-plt.plot(x, unl_hess_r, linestyle='-.', color='k',  marker='D', fillstyle='none', markevery=markevery,
-         label='HBFU',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
+# plt.plot(x, unl_vbu, linestyle=':', color='r',  marker='^', fillstyle='none', markevery=markevery,
+#          label='VBU', linewidth=l_w,  markersize=m_s, markeredgewidth=marker_s)
+#
+# plt.plot(x, unl_hess_r, linestyle='-.', color='k',  marker='D', fillstyle='none', markevery=markevery,
+#          label='HBFU',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
 
 
@@ -56,15 +56,15 @@ plt.plot(x, unl_hess_r, linestyle='-.', color='k',  marker='D', fillstyle='none'
 plt.grid()
 leg = plt.legend(fancybox=True, shadow=True)
 # plt.xlabel('Malicious Client Ratio (%)' ,fontsize=16)
-plt.ylabel('Mutual Information' ,fontsize=24)
-my_y_ticks = np.arange(0, 141, 20)
+plt.ylabel('MI of $I(Z_e;X_e)$' ,fontsize=24)
+my_y_ticks = np.arange(0, 21, 4)
 plt.yticks(my_y_ticks, fontsize=20)
 plt.xlabel('$\it{SR}$', fontsize=20)
 
 plt.xticks(x, labels, fontsize=20)
 # plt.title('CIFAR10 IID')
 
-plt.title('(d) Privacy Preservation', fontsize=24)
+plt.title('(d) Information in $Z_e$', fontsize=24)
 plt.legend(loc='best', fontsize=20)
 plt.tight_layout()
 #plt.title("MNIST")

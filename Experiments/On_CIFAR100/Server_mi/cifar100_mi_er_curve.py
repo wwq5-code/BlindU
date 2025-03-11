@@ -21,8 +21,8 @@ unl_hess_r = [5.124, 4.951407, 6.93,4.606, 3.0253]
 unl_vbu = [48.9582, 54.9582, 52.9582, 55.9582, 50.9582]
 # unl_vbu = [103.73, 122.254, 117.65, 126.01, 110.23]
 
-unl_ss_w = [5.7664, 7.382, 4.298, 3.532, 4.068]
-unl_ss_wo = [7.3546, 6.1284, 5.0459, 4.089, 3.21704]
+unl_ss_w = [4.7664, 5.382, 4.298, 4.532, 5.068]
+unl_ss_wo = [5.0546, 5.5284, 5.0459, 5.089, 5.51704]
 
 
 
@@ -40,12 +40,12 @@ plt.plot(x, unl_ss_w, linestyle='-', color='b', marker='o', fillstyle='none', ma
 plt.plot(x, unl_ss_wo, linestyle='--', color='g',  marker='s', fillstyle='none', markevery=markevery,
          label='PriMU$_{w/o}$',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
-plt.plot(x, unl_vbu, linestyle=':', color='r',  marker='^', fillstyle='none', markevery=markevery,
-         label='VBU', linewidth=l_w,  markersize=m_s, markeredgewidth=marker_s)
-
-plt.plot(x, unl_hess_r, linestyle='-.', color='k',  marker='D', fillstyle='none', markevery=markevery,
-         label='HBFU',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
-
+# plt.plot(x, unl_vbu, linestyle=':', color='r',  marker='^', fillstyle='none', markevery=markevery,
+#          label='VBU', linewidth=l_w,  markersize=m_s, markeredgewidth=marker_s)
+#
+# plt.plot(x, unl_hess_r, linestyle='-.', color='k',  marker='D', fillstyle='none', markevery=markevery,
+#          label='HBFU',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
+#
 
 
 #plt.plot(x, unl_vibu, color='silver',  marker='d',  label='VIBU',linewidth=4,  markersize=10)
@@ -59,14 +59,14 @@ plt.plot(x, unl_hess_r, linestyle='-.', color='k',  marker='D', fillstyle='none'
 plt.grid()
 leg = plt.legend(fancybox=True, shadow=True)
 # plt.xlabel('Malicious Client Ratio (%)' ,fontsize=16)
-plt.ylabel('Mutual Information' ,fontsize=24)
-my_y_ticks = np.arange(0 ,61,10)
+plt.ylabel('MI of $I(Z_e;X_e)$' ,fontsize=24)
+my_y_ticks = np.arange(0 ,11,2)
 plt.yticks(my_y_ticks,fontsize=20)
 plt.xlabel('$\it{EDR}$' ,fontsize=20)
 
 plt.xticks(x, labels, fontsize=20)
 # plt.title('CIFAR10 IID')
-plt.title('(g) Privacy Preservation', fontsize=24)
+plt.title('(g) Information in $Z_e$', fontsize=24)
 plt.legend(loc='best',fontsize=20)
 plt.tight_layout()
 #plt.title("MNIST")
