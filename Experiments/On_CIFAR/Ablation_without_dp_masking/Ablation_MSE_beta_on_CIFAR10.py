@@ -58,10 +58,10 @@ plt.plot(x, unl_org_0, linestyle=':', color='r',  marker='^', fillstyle='none', 
 #plt.plot(x, without_replacement, color='palegreen',  marker='1',  label='RFU-SS',linewidth=l_w, markersize=m_s)
 
 plt.plot(x, unl_ss_w, linestyle='-', color='b', marker='o', fillstyle='none', markevery=markevery,
-         label='PriMU$_{w}$', linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
+         label='BlindU$_{w}$', linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
 plt.plot(x, unl_ss_wo, linestyle='--', color='g',  marker='s', fillstyle='none', markevery=markevery,
-         label='PriMU',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
+         label='BlindU',linewidth=l_w, markersize=m_s, markeredgewidth=marker_s)
 
 
 
@@ -91,7 +91,7 @@ plt.xticks(x, labels, fontsize=20)
 # plt.title('CIFAR10 IID')
 
 #plt.title('(a) Inference of different $\\beta$', fontsize=20)
-plt.legend(loc='best',fontsize=20)
+plt.legend(loc=(0.3,0.17),fontsize=20)
 plt.tight_layout()
 #plt.title("MNIST")
 plt.rcParams['figure.figsize'] = (2.0, 1)

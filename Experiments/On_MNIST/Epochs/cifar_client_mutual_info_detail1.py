@@ -52,9 +52,9 @@ plt.figure()
 lw=5
 # plt.plot(x, y_bfu_acc_list, color='orange',  marker='x',  label='BFU',linewidth=4,  markersize=10)
 # plt.plot(x, y_primu_wo, color='b',  marker='x',  label='BFU2',linewidth=4,  markersize=10)
-plt.plot(x, y_bfu_acc_list, color='g', linestyle='-',  label='PriMU$_{w}$',linewidth=lw, markersize=10)
+plt.plot(x, y_bfu_acc_list, color='g', linestyle='-',  label='BlindU$_{w}$',linewidth=lw, markersize=10)
 # #plt.plot(x, y_fkl, color='g',  marker='+',  label='VRFL')
-plt.plot(x, y_primu_wo, color='b', linestyle=(0,(3,1,1,1)),  label='PriMU$_{w/o}$',linewidth=lw, markersize=10)
+plt.plot(x, y_primu_wo, color='b', linestyle=(0,(3,1,1,1)),  label='BlindU$_{w/o}$',linewidth=lw, markersize=10)
 
 # plt.plot(x, unl_fr, color='blue', marker='^', label='Retrain',linewidth=4, markersize=10)
 # plt.plot(x, unl_br, color='orange',  marker='x',  label='BFU',linewidth=4,  markersize=10)
